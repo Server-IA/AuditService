@@ -82,6 +82,40 @@ docker exec -it auditservice-audit-db-1 psql -U audit
 - Endpoint base de API para consulta de eventos:
 http://localhost:8070/audit-events
 
+- Desglose estructural del evento (JSON):
+```json
+  {
+    "event_id": "75262d10-9015-4d24-bd9d-40e198bde5c9",
+    "ts": "2025-09-04T07:04:25.713351+00:00",
+    "actor_id": null,
+    "actor_role": null,
+    "actor_type": "service",
+    "request_id": "522f0119-4394-4751-befd-50c3968e04fe",
+    "ip": "172.18.0.1",
+    "user_agent": "PostmanRuntime/7.45.0",
+    "service": "users",
+    "module": "gestion_usuarios",
+    "submodule": "roles",
+    "feature": "create_role",
+    "object_type": "role",
+    "object_id": "51",
+    "operation": "CREATE",
+    "before": null,
+    "after": {
+      "id": 51,
+      "name": "rol_nonloso",
+      "status": 1,
+      "description": "Descripción..",
+      "permissions": [
+        10
+      ]
+    },
+    "meta": {
+      "source": "roles.create_role"
+    }
+  }
+```
+
 ## [+]. Consideraciones Finales
 
 - Todo el desarrollo y ejecución de este backend se realiza dentro de **Docker**, por lo que **no es necesario configurar entornos virtuales locales**.  
