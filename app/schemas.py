@@ -18,3 +18,5 @@ class AuditEventIn(BaseModel):
     before: Optional[Dict[str, Any]] = None
     after: Optional[Dict[str, Any]] = None
     meta: Optional[Dict[str, Any]] = None
+    submodule: Optional[str] = None
+    feature: Optional[str] = None

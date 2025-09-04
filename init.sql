@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS audit_events (
     user_agent  text,
     service     text NOT NULL, -- users | machinery | payroll | ...
     module      text NOT NULL, -- gestion_usuarios | nomina | ...
+    submodule   text,          -- NUEVO: roles, permisos, etc.
+    feature     text,          -- NUEVO: create_role, edit_role, etc.
     object_type text,
     object_id   text,
     operation   text NOT NULL, -- ACCESS | REGISTER | UPDATE | ...
@@ -30,3 +32,14 @@ CREATE INDEX IF NOT EXISTS idx_audit_operation
 
 CREATE INDEX IF NOT EXISTS idx_audit_lookup
     ON audit_events (module, object_type, object_id);
+
+-- NUEVOS: filtros directos del frontend
+CREATE INDEX IF NOT EXISTS idx_audit_submodule
+    ON audit_events (submodule);
+
+CREATE INDEX IF NOT EXISTS idx_audit_feature
+    ON audit_events (feature);
+
+-- (Opcional) si seguirás filtrando por meta.source
+-- CREATE INDEX IF NOT EXISTS idx_audit_meta_source
+--     ON audit_events ((meta->>'source'));
