@@ -71,7 +71,14 @@ Desde el directorio del repositorio ejecutar el siguiente comando:
 docker-compose up --build -d
 ```
 
-## 6. Consideraciones Finales
+## 6. Comandos adicionales:
+
+- Conexión al container de la db:
+```bash
+docker exec -it auditservice-audit-db-1 psql -U audit
+```
+
+## [+]. Consideraciones Finales
 
 - Todo el desarrollo y ejecución de este backend se realiza dentro de **Docker**, por lo que **no es necesario configurar entornos virtuales locales**.  
 - Antes de levantar este contenedor, valida siempre que:
