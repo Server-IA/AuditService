@@ -71,12 +71,15 @@ Desde el directorio del repositorio ejecutar el siguiente comando:
 docker-compose up --build -d
 ```
 
-## 6. Comandos adicionales:
+## 6. Anexos:
 
 - Conexión al container de la db:
 ```bash
 docker exec -it auditservice-audit-db-1 psql -U audit
 ```
+
+- Endpoint base de API para consulta de eventos:
+http://localhost:8070/audit-events
 
 ## [+]. Consideraciones Finales
 
