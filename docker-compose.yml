@@ -1,0 +1,45 @@
+services:
+  audit-db:
+    image: postgres:16-alpine
+    # TIP: si usas esta pila en varios proyectos, evita container_name para no colisionar.
+    # container_name: audit_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5440:5432"        # opcional: solo si quieres acceder desde tu host (psql local)
+    volumes:
+      - audit_pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
+    networks:
+      - shared_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  audit-service:
+    build: .
+    # container_name: audit_service
+    env_file: .env
+    environment:
+      AUDIT_DB_DSN: ${AUDIT_DB_DSN}
+      AUDIT_TOKEN: ${AUDIT_TOKEN}
+    ports:
+      - "8070:8000"        # expone el API al host (útil en dev)
+    depends_on:
+      audit-db:
+        condition: service_healthy
+    networks:
+      - shared_net
+    restart: unless-stopped
+
+volumes:
+  audit_pgdata:
+
+networks:
+  shared_net:
+    external: true
