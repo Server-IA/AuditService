@@ -25,6 +25,7 @@ Copia el archivo `.env.example` a `.env` y ajusta los valores:
 
 **Desde el proyecto que consumirá el microservicio (UsersMachPay), adicionar:**
 ```dotenv
+SERVICE_NAME=users
 AUDIT_URL=http://audit-service:8000/audit-events
 AUDIT_TOKEN=devtoken
 AUDIT_HTTP_TIMEOUT=1.5
