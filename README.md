@@ -26,12 +26,12 @@ Copia el archivo `.env.example` a `.env` y ajusta los valores:
 **Desde el proyecto que consumirá el microservicio (UsersMachPay), adicionar:**
 ```dotenv
 SERVICE_NAME=users
-AUDIT_URL=http://audit-service:8000/audit-events
+AUDIT_URL=http://audit-service:8002/audit-events
 AUDIT_TOKEN=devtoken
 AUDIT_HTTP_TIMEOUT=1.5
 ```
 
-**Desde el microservicio (AuditService):**
+**Desde el microservicio para la rama main (AuditService):**
 ```dotenv
 # INTERNAL CONTAINER
 AUDIT_DB_DSN=postgresql://audit:audit@audit-db:5432/audit
@@ -43,6 +43,19 @@ AUDIT_TOKEN=devtoken
 POSTGRES_DB=audit
 POSTGRES_USER=audit
 POSTGRES_PASSWORD=audit
+```
+**Desde el microservicio para la rama auditBackend (AuditService):**
+```dotenv
+# INTERNAL CONTAINER
+AUDIT_DB_DSN=postgresql://postgres:root1234.@machpay_db:5432/auditdb
+
+# AUTH API 
+AUDIT_TOKEN=devtoken
+
+# POSTGRES VARS
+POSTGRES_DB=auditdb
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=root1234.
 ```
 
 ## 3. Crear la Red de Docker
