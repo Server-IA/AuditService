@@ -56,6 +56,10 @@ AUDIT_TOKEN=devtoken
 POSTGRES_DB=auditdb
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=root1234.
+
+# FRONT SERVICE
+FRONTEND_PRUEBAS_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:3000
 ```
 
 ## 3. Crear la Red de Docker
