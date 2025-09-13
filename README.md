@@ -93,7 +93,7 @@ docker exec -it auditservice-audit-db-1 psql -U audit
 ```
 
 - Endpoint base de API para consulta de eventos:
-http://localhost:8070/audit-events
+http://localhost:8002/audit-events
 
 - Desglose estructural del evento (JSON):
 ```json
