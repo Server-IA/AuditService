@@ -1,7 +1,7 @@
 services:
   audit-service:
     build: .
-    # container_name: audit_service
+    container_name: backend_audit
     env_file:
       - .env
     environment:
