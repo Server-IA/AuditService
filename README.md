@@ -116,6 +116,70 @@ http://localhost:8070/audit-events
   }
 ```
 
+## TEMPORAL AUDIT OUTPUT
+```json
+  {
+    "event_id": "930c98c1-8158-46c3-94ce-8bebf08261d4",
+    "ts": "2025-09-15T22:34:23.079994+00:00",
+    "actor_id": "11",
+    "actor_role": "for_testing",
+    "actor_type": "user",
+    "request_id": "6a2c29c4-c701-4255-8e75-444b33119d22",
+    "ip": "172.18.0.1",
+    "user_agent": "PostmanRuntime/7.46.0",
+    "service": "users",
+    "module": "gestion_usuarios",
+    "submodule": "roles",
+    "feature": "edit",
+    "object_type": "role",
+    "object_id": "79",
+    "operation": "UPDATE",
+    "before": {
+      "id": 79,
+      "name": "perito",
+      "status": 1,
+      "description": "Control sobre módulo de nómina.",
+      "permissions": [
+        13
+      ]
+    },
+    "after": {
+      "id": 79,
+      "name": "perito",
+      "status": 1,
+      "description": "Control parcial sobre módulo nomina.",
+      "permissions": [
+        3
+      ]
+    },
+    "meta": {
+      "source": "roles.edit_role",
+      "actor_roles_ids": [
+        70
+      ]
+    },
+    "permission_id": 15,
+    "diff": {
+      "added": {},
+      "changed": {
+        "description": {
+          "to": "Control parcial sobre módulo nomina.",
+          "from": "Control sobre módulo de nómina."
+        },
+        "permissions": {
+          "to": [
+            3
+          ],
+          "from": [
+            13
+          ]
+        }
+      },
+      "removed": {}
+    }
+  }
+```
+
 ## [+]. Consideraciones Finales
 
 - Todo el desarrollo y ejecución de este backend se realiza dentro de **Docker**, por lo que **no es necesario configurar entornos virtuales locales**.  
