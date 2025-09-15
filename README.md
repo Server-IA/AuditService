@@ -117,6 +117,10 @@ http://localhost:8070/audit-events
 ```
 
 ## TEMPORAL AUDIT OUTPUT
+> Campos de interés:
+- "permission_id"
+- "diff"
+
 ```json
   {
     "event_id": "930c98c1-8158-46c3-94ce-8bebf08261d4",
