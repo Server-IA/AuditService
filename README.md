@@ -25,6 +25,7 @@ Copia el archivo `.env.example` a `.env` y ajusta los valores:
 
 **Desde el proyecto que consumirá el microservicio (UsersMachPay), adicionar:**
 ```dotenv
+SERVICE_NAME=users
 AUDIT_URL=http://audit-service:8000/audit-events
 AUDIT_TOKEN=devtoken
 AUDIT_HTTP_TIMEOUT=1.5
@@ -80,6 +81,69 @@ docker exec -it auditservice-audit-db-1 psql -U audit
 
 - Endpoint base de API para consulta de eventos:
 http://localhost:8070/audit-events
+
+- Estructural del evento (JSON):
+```json
+  {
+    "event_id": "6fae6134-7747-4006-916c-3d4124a12a30",
+    "ts": "2025-09-16T05:46:20.395532+00:00",
+    "actor_id": "1",
+    "actor_role": "administrador",
+    "request_id": "f7178180-e51a-47c0-87fd-8698ec00cb56",
+    "ip": "172.18.0.1",
+    "user_agent": "PostmanRuntime/7.46.0",
+    "module": "users management",
+    "submodule": "users",
+    "feature": "change_status",
+    "object_type": "user_status",
+    "object_id": "10",
+    "operation": "UPDATE",
+    "before": {
+      "id": 10,
+      "name": "joseph",
+      "email": "tester123@gmail.com",
+      "roles": [
+        83
+      ],
+      "gender_id": 1,
+      "status_id": 1,
+      "first_last_name": "mendez",
+      "second_last_name": "vega"
+    },
+    "after": {
+      "id": 10,
+      "name": "joseph",
+      "email": "tester123@gmail.com",
+      "roles": [
+        83
+      ],
+      "gender_id": 1,
+      "status_id": 2,
+      "first_last_name": "mendez",
+      "second_last_name": "vega"
+    },
+    "meta": {
+      "source": "users.change_user_status",
+      "new_status": 2,
+      "actor_roles_ids": [
+        56,
+        32,
+        13,
+        14
+      ]
+    },
+    "permission_id": 10,
+    "diff": {
+      "changed": {
+        "status_id": {
+          "to": 2,
+          "from": 1
+        }
+      },
+      "removed": {}
+    }
+  }
+```
 
 ## [+]. Consideraciones Finales
 
