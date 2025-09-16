@@ -142,7 +142,7 @@ http://localhost:8070/audit-events
       },
       "removed": {}
     }
-  },
+  }
 ```
 
 ## [+]. Consideraciones Finales
