@@ -82,106 +82,67 @@ docker exec -it auditservice-audit-db-1 psql -U audit
 - Endpoint base de API para consulta de eventos:
 http://localhost:8070/audit-events
 
-- Desglose estructural del evento (JSON):
+- Estructural del evento (JSON):
 ```json
   {
-    "event_id": "75262d10-9015-4d24-bd9d-40e198bde5c9",
-    "ts": "2025-09-04T07:04:25.713351+00:00",
-    "actor_id": null,
-    "actor_role": null,
-    "actor_type": "service",
-    "request_id": "522f0119-4394-4751-befd-50c3968e04fe",
-    "ip": "172.18.0.1",
-    "user_agent": "PostmanRuntime/7.45.0",
-    "service": "users",
-    "module": "gestion_usuarios",
-    "submodule": "roles",
-    "feature": "create_role",
-    "object_type": "role",
-    "object_id": "51",
-    "operation": "CREATE",
-    "before": null,
-    "after": {
-      "id": 51,
-      "name": "rol_nonloso",
-      "status": 1,
-      "description": "Descripción..",
-      "permissions": [
-        10
-      ]
-    },
-    "meta": {
-      "source": "roles.create_role"
-    }
-  }
-```
-
-## TEMPORAL AUDIT OUTPUT
-> Campos de interés:
-- "permission_id"
-- "diff"
-
-```json
-  {
-    "event_id": "930c98c1-8158-46c3-94ce-8bebf08261d4",
-    "ts": "2025-09-15T22:34:23.079994+00:00",
-    "actor_id": "11",
-    "actor_role": "for_testing",
-    "actor_type": "user",
-    "request_id": "6a2c29c4-c701-4255-8e75-444b33119d22",
+    "event_id": "6fae6134-7747-4006-916c-3d4124a12a30",
+    "ts": "2025-09-16T05:46:20.395532+00:00",
+    "actor_id": "1",
+    "actor_role": "administrador",
+    "request_id": "f7178180-e51a-47c0-87fd-8698ec00cb56",
     "ip": "172.18.0.1",
     "user_agent": "PostmanRuntime/7.46.0",
-    "service": "users",
-    "module": "gestion_usuarios",
-    "submodule": "roles",
-    "feature": "edit",
-    "object_type": "role",
-    "object_id": "79",
+    "module": "users management",
+    "submodule": "users",
+    "feature": "change_status",
+    "object_type": "user_status",
+    "object_id": "10",
     "operation": "UPDATE",
     "before": {
-      "id": 79,
-      "name": "perito",
-      "status": 1,
-      "description": "Control sobre módulo de nómina.",
-      "permissions": [
-        13
-      ]
+      "id": 10,
+      "name": "joseph",
+      "email": "tester123@gmail.com",
+      "roles": [
+        83
+      ],
+      "gender_id": 1,
+      "status_id": 1,
+      "first_last_name": "mendez",
+      "second_last_name": "vega"
     },
     "after": {
-      "id": 79,
-      "name": "perito",
-      "status": 1,
-      "description": "Control parcial sobre módulo nomina.",
-      "permissions": [
-        3
-      ]
+      "id": 10,
+      "name": "joseph",
+      "email": "tester123@gmail.com",
+      "roles": [
+        83
+      ],
+      "gender_id": 1,
+      "status_id": 2,
+      "first_last_name": "mendez",
+      "second_last_name": "vega"
     },
     "meta": {
-      "source": "roles.edit_role",
+      "source": "users.change_user_status",
+      "new_status": 2,
       "actor_roles_ids": [
-        70
+        56,
+        32,
+        13,
+        14
       ]
     },
-    "permission_id": 15,
+    "permission_id": 10,
     "diff": {
-      "added": {},
       "changed": {
-        "description": {
-          "to": "Control parcial sobre módulo nomina.",
-          "from": "Control sobre módulo de nómina."
-        },
-        "permissions": {
-          "to": [
-            3
-          ],
-          "from": [
-            13
-          ]
+        "status_id": {
+          "to": 2,
+          "from": 1
         }
       },
       "removed": {}
     }
-  }
+  },
 ```
 
 ## [+]. Consideraciones Finales
