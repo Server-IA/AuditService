@@ -156,7 +156,7 @@ Inicio de sesión no exitoso:
     "operation": "ACCESS",
     "before": null,
     "after": null,
-    "meta": {
+    "meta": { // justo aquí
       "reason": "invalid_credentials",
       "result": "failed",
       "source": "auth.login",
