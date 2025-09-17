@@ -72,17 +72,103 @@ Desde el directorio del repositorio ejecutar el siguiente comando:
 docker-compose up --build -d
 ```
 
-## 6. Anexos:
+## 6. Contexto de uso y alcance:
+El microservico de auditoría contempla las siguientes acciones:
 
-- Conexión al container de la db:
-```bash
-docker exec -it auditservice-audit-db-1 psql -U audit
+```rb
+Create role 
+Create permission 
+Edit role 
+Change rol status 
+Update user roles 
+Update rol permissions 
+Assign role 
+Revoke rol 
+Delete rol 
+
+Create user by admin 
+Complete pre register (validate doc) [?]
+Complete pre register [?]
+Activate account [?]
+Edit profile 
+Editar información completa del usuario (como Admin) 
+
+Change user status 
+Change password 
+
+Admin/User auth login 
+Update password via token [?]
+
+Request reset password [?]
 ```
+**NOTA:**
+Para las acciones que al final de la línea tienen un **"[?]"**, no se incluye información del actor (actor_id, rol_id) y del permiso (permission_id), debido a que no hay contexto de autenticación y/o permiso contemplado en las respectivas funciones.
 
-- Endpoint base de API para consulta de eventos:
+### Filtros (query parameters)
+El microservicio permite filtrar resultados de manera directa a través los siguientes parámetros:
+
+	•	actor_id — ID del actor que ejecutó la acción (string).
+	•	operation — Tipo de operación (ACCESS, CREATE, UPDATE, DELETE, etc.).
+	•	module — Módulo canónico (ej. users_management).
+	•	submodule — Submódulo (ej. roles, users, auth).
+	•	feature — Acción/feature (ej. login, create, edit, change_user_password).
+	•	object_type — Tipo de objeto (ej. user, role, permission).
+	•	object_id — ID del objeto afectado (string).
+	•	source — Atajo para meta->>'source' (ej. roles.edit_role, auth.login).
+	•	permission_id — ID del permiso bajo el cual se ejecutó la acción (int).
+	•	date_from — ISO 8601 (inclusive). Filtra ts >= date_from.
+	•	date_to — ISO 8601 (inclusive). Filtra ts <= date_to.
+	•	limit — Límite de filas (por defecto 100).
+	•	offset — Desplazamiento para paginación (por defecto 0).
+
+ - Endpoint base de API para consulta de eventos:
 http://localhost:8070/audit-events
 
-- Estructural del evento (JSON):
+ **Ejemplo**: 
+ Búsqueda con filtros anidados:
+ ```bash
+curl -s "http://localhost:8070/audit-events\
+?operation=UPDATE\
+&submodule=roles\
+&feature=edit\
+&permission_id=15\
+&actor_id=11\
+&date_from=2025-09-16T00:00:00Z"
+```
+**Nota:**
+Los atributos flexibles viven en meta (JSON). Estos son útiles en contextos de autenticación.
+- Ejemplo:
+Inicio de sesión no exitoso:
+```json
+  {
+    "event_id": "c08b14c6-ed8f-453b-ab64-3e7a584346c7",
+    "ts": "2025-09-16T06:07:33.527065+00:00",
+    "actor_id": null,
+    "actor_role": null,
+    "request_id": "4fb518f6-f211-4c89-a403-d195d19dba15",
+    "ip": "172.18.0.1",
+    "user_agent": "PostmanRuntime/7.46.0",
+    "module": "gestion_usuarios",
+    "submodule": "auth",
+    "feature": "login",
+    "object_type": "user",
+    "object_id": null,
+    "operation": "ACCESS",
+    "before": null,
+    "after": null,
+    "meta": {
+      "reason": "invalid_credentials",
+      "result": "failed",
+      "source": "auth.login",
+      "username_hint": "correo@usco.edu.co",
+      "actor_roles_ids": []
+    },
+    "permission_id": null,
+    "diff": null
+  }
+```
+
+- Estructural de un evento 'UPDATE':
 ```json
   {
     "event_id": "6fae6134-7747-4006-916c-3d4124a12a30",
@@ -133,16 +219,22 @@ http://localhost:8070/audit-events
       ]
     },
     "permission_id": 10,
-    "diff": {
+    "diff": { // Permite obtener el campo(s) alterado o eliminado
       "changed": {
         "status_id": {
-          "to": 2,
-          "from": 1
+          "to": 2, // estado actual (luego de la transacción)
+          "from": 1 // estado anterior
         }
       },
       "removed": {}
     }
   }
+```
+
+## 7. Anexos:
+- Conexión al container de la db:
+```bash
+docker exec -it auditservice-audit-db-1 psql -U audit
 ```
 
 ## [+]. Consideraciones Finales
