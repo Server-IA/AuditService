@@ -124,7 +124,7 @@ El microservicio permite filtrar resultados de manera directa a través los sigu
  - Endpoint base de API para consulta de eventos:
 http://localhost:8070/audit-events
 
- **Ejemplo**: 
+ - **Ejemplo**: <br>
  Búsqueda con filtros anidados:
  ```bash
 curl -s "http://localhost:8070/audit-events\
@@ -137,7 +137,7 @@ curl -s "http://localhost:8070/audit-events\
 ```
 **Nota:**
 > Los atributos flexibles viven en meta (JSON). Estos son útiles en contextos de autenticación.
-- Ejemplo:
+- **Ejemplo:** <br>
 Inicio de sesión no exitoso:
 ```json
   {
