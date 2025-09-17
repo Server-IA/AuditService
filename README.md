@@ -102,7 +102,7 @@ Update password via token [?]
 Request reset password [?]
 ```
 **NOTA:**
-Para las acciones que al final de la línea tienen un **"[?]"**, no se incluye información del actor (actor_id, rol_id) y del permiso (permission_id), debido a que no hay contexto de autenticación y/o permiso contemplado en las respectivas funciones.
+> Para las acciones que al final de la línea tienen un **"[?]"**, no se incluye información del actor (actor_id, rol_id) y del permiso (permission_id), debido a que no hay contexto de autenticación y/o permiso contemplado en las respectivas funciones.
 
 ### Filtros (query parameters)
 El microservicio permite filtrar resultados de manera directa a través los siguientes parámetros:
@@ -136,7 +136,7 @@ curl -s "http://localhost:8070/audit-events\
 &date_from=2025-09-16T00:00:00Z"
 ```
 **Nota:**
-Los atributos flexibles viven en meta (JSON). Estos son útiles en contextos de autenticación.
+> Los atributos flexibles viven en meta (JSON). Estos son útiles en contextos de autenticación.
 - Ejemplo:
 Inicio de sesión no exitoso:
 ```json
