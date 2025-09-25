@@ -1,30 +1,94 @@
-from typing import Optional, Dict, Any, Union
-from pydantic import BaseModel, ConfigDict
+from __future__ import annotations
+
+from typing import Optional, Dict, Any
+from datetime import datetime, timezone
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+
+
+class AuditDiff(BaseModel):
+    """
+    Nuevo diff v2 extendido que incluye:
+      - created: objetos totalmente nuevos (sin "from")
+      - changed: campos modificados { field: {"from": X, "to": Y}, ... }
+      - removed: campos eliminados { field: <valor_anterior>, ... }
+
+    Se fuerza que los tres sean diccionarios y por defecto vacíos.
+    """
+    created: Dict[str, Any] = Field(default_factory=dict)
+    changed: Dict[str, Any] = Field(default_factory=dict)
+    removed: Dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def _validate_shapes(self) -> "AuditDiff":
+        if not isinstance(self.created, dict):
+            raise ValueError("diff.created debe ser un objeto (dict).")
+        if not isinstance(self.changed, dict):
+            raise ValueError("diff.changed debe ser un objeto (dict).")
+        if not isinstance(self.removed, dict):
+            raise ValueError("diff.removed debe ser un objeto (dict).")
+        return self
+
 
 class AuditEventIn(BaseModel):
-    event_id: Optional[str] = None
-    ts: Optional[str] = None
+    """
+    Evento de entrada para ingest v2.
+    - permission_description: texto opcional con la descripción del permiso (se puede poblar en el emisor).
+    - diff: AuditDiff (ahora con created/changed/removed).
+    """
+    # IDs / tiempo
+    event_id: Optional[str] = Field(default=None)
+    ts: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp del evento. Si llega naive, se asume UTC.",
+    )
 
-    actor_id: Optional[str] = None
-    actor_role: Optional[str] = None
+    # Actor
+    actor_id: str
+    actor_name: str
+    actor_role: str
 
-    request_id: Optional[str] = None
+    # Contexto
     ip: Optional[str] = None
     user_agent: Optional[str] = None
 
-    module: str
-    object_type: Optional[str] = None
     object_id: Optional[str] = None
+
+    # Operación & permiso
     operation: str
+    permission_id: Optional[int] = None
+    permission_description: Optional[str] = None 
 
-    before: Optional[Dict[str, Any]] = None
-    after: Optional[Dict[str, Any]] = None
-    meta: Optional[Dict[str, Any]] = None
+    # Diff
+    diff: AuditDiff = Field(default_factory=AuditDiff)
 
-    submodule: Optional[str] = None
-    feature: Optional[str] = None
+    model_config = ConfigDict(extra="forbid")
 
-    permission_id: Optional[Union[int, str]] = None
-    diff: Optional[Dict[str, Any]] = None  
+    # --- Normalizaciones/validaciones ---
 
-    model_config = ConfigDict(extra="ignore")
+    @field_validator("ts", mode="before")
+    @classmethod
+    def _parse_ts(cls, v):
+        # mantener compatibilidad con strings ISO y datetime; asumir UTC si es naive
+        if v is None:
+            return None
+        if isinstance(v, datetime):
+            return v.replace(tzinfo=timezone.utc) if v.tzinfo is None else v
+        dt = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+        return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+    @field_validator("operation")
+    @classmethod
+    def _upper_operation(cls, v: str) -> str:
+        if not v:
+            raise ValueError("operation es requerido.")
+        return str(v).upper()
+
+    @model_validator(mode="after")
+    def _required_actor_fields(self) -> "AuditEventIn":
+        # Campos actor obligatorios no vacíos
+        for f in ("actor_id", "actor_name", "actor_role"):
+            if not getattr(self, f, None):
+                raise ValueError(f"{f} es requerido.")
+        return self

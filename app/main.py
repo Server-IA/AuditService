@@ -1,119 +1,176 @@
-import os, uuid, datetime, json
+from __future__ import annotations
+
+import os
+import uuid
+import json
+from datetime import datetime, timezone
+from typing import List, Dict, Any
+
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+
+try:
+    from zoneinfo import ZoneInfo
+except Exception:
+    ZoneInfo = None
+
 from .schemas import AuditEventIn
 from .db import get_conn
 
 AUDIT_TOKEN = os.getenv("AUDIT_TOKEN", "devtoken")
+DEFAULT_TZ = os.getenv("AUDIT_LIST_TZ", "America/Bogota")  # Zona horaria por defecto para listados
 
-app = FastAPI(title="Audit Service", version="0.1.0")
+app = FastAPI(title="Audit Service", version="2.0.0")
+
+
+# Helpers
+def _ensure_dt_utc(dt: datetime | None) -> datetime:
+    """Si viene None, ahora en UTC. Si viene naive, asumir UTC; si trae tz, convertir a UTC."""
+    if dt is None:
+        return datetime.now(timezone.utc)
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _to_tz(dt: datetime, tz_name: str | None) -> datetime:
+    """Convierte un datetime aware (UTC) a tz de salida; si falla, deja UTC."""
+    if tz_name and ZoneInfo:
+        try:
+            return dt.astimezone(ZoneInfo(tz_name))
+        except Exception:
+            pass
+    return dt
+
 
 @app.post("/audit-events", status_code=202)
-def ingest(ev: AuditEventIn, x_audit_token: str = Header(None)):
-    # 1) Validar token
+def ingest_v2(event: AuditEventIn, x_audit_token: str = Header(None)):
+    # 1) Token
     if x_audit_token != AUDIT_TOKEN:
         raise HTTPException(401, "Invalid audit token")
 
-    # 2) Generar event_id y timestamp 
-    event_id = ev.event_id or str(uuid.uuid4())
-    ts = ev.ts or (datetime.datetime.utcnow().isoformat() + "Z")
+    # 2) ID y timestamp
+    event_id = event.event_id or str(uuid.uuid4())
+    ts_utc = _ensure_dt_utc(event.ts)
 
-    # 3) Preparar submodule & feature
-    submodule = ev.submodule
-    feature = ev.feature
-    if (not submodule or not feature) and ev.meta and isinstance(ev.meta.get("source"), str):
-        src = ev.meta["source"]
-        if "." in src:
-            left, right = src.split(".", 1)
-            submodule = submodule or left
-            feature   = feature   or right
+    # 3) Normalizar operation
+    operation = (event.operation or "").upper()
+    if not operation:
+        raise HTTPException(400, "operation es requerido")
 
-    # 4) Normalizar permission_id 
-    perm_id_value = None
-    if ev.permission_id is not None:
-        if isinstance(ev.permission_id, int):
-            perm_id_value = ev.permission_id
-        elif isinstance(ev.permission_id, str) and ev.permission_id.isdigit():
-            perm_id_value = int(ev.permission_id)
-
+    diff_json = json.dumps(event.diff.model_dump() if event.diff else {"created": {}, "changed": {}, "removed": {}})
     with get_conn() as conn, conn.cursor() as cur:
-        cur.execute("""
-            INSERT INTO audit_events (
-                event_id, ts, actor_id, actor_role,
-                request_id, ip, user_agent,
-                module, submodule, feature,
-                object_type, object_id, operation,
-                before, after, meta,
-                permission_id, diff
-                ) VALUES (
-                %s, %s, %s, %s,
-                %s, %s, %s,
-                %s, %s, %s,
-                %s, %s, %s,
-                %s::jsonb, %s::jsonb, %s::jsonb,
-                %s, %s::jsonb
-            )
-        """, (
-            event_id, ts, ev.actor_id, ev.actor_role,
-            ev.request_id, ev.ip, ev.user_agent,
-            ev.module, submodule, feature,
-            ev.object_type, ev.object_id, ev.operation,
-            json.dumps(ev.before) if ev.before is not None else None,
-            json.dumps(ev.after)  if ev.after  is not None else None,
-            json.dumps(ev.meta)   if ev.meta   is not None else None,
-            perm_id_value,
-            json.dumps(ev.diff) if ev.diff is not None else None,
-        ))
+        # comprobar si existe la columna permission_description en audit_events
+        cur.execute(
+            """
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = 'audit_events' AND column_name = 'permission_description'
+            LIMIT 1
+            """
+        )
+        has_perm_desc = cur.fetchone() is not None
+
+        # columnas comunes
+        cols = [
+            "event_id", "ts",
+            "actor_id", "actor_name", "actor_role",
+            "ip", "user_agent",
+            "object_id", "operation",
+            "permission_id", "diff"
+        ]
+        vals = ["%s"] * len(cols)
+
+        params: List[Any] = [
+            event_id,
+            ts_utc,
+            event.actor_id,
+            event.actor_name,
+            event.actor_role,
+            event.ip,
+            event.user_agent,
+            event.object_id,
+            operation,
+            event.permission_id,
+            diff_json,
+        ]
+
+        if has_perm_desc:
+            # insertar permission_description justo después de permission_id 
+            insert_pos = cols.index("permission_id") + 1
+            cols.insert(insert_pos, "permission_description")
+            vals.insert(insert_pos, "%s")
+            params.insert(insert_pos, event.permission_description)
+
+        sql = f"INSERT INTO audit_events ({', '.join(cols)}) VALUES ({', '.join(vals)})"
+        cur.execute(sql, params)
         conn.commit()
 
-    # 6) Respuesta
     return {"accepted": True, "event_id": event_id}
 
-@app.get("/audit-events")
-def list_events(
-    actor_id: str | None = None,
-    operation: str | None = None,
-    module: str | None = None,
-    object_type: str | None = None,
-    object_id: str | None = None,
-    submodule: str | None = Query(None),
-    feature: str | None = Query(None),
-    source: str | None = Query(None),
-    date_from: str | None = Query(None),
-    date_to: str | None = Query(None),
-    permission_id: int | None = Query(None),
-    limit: int = 100,
-    offset: int = 0,
-):
-    q = ["SELECT * FROM audit_events WHERE 1=1"]
-    p: list = []
 
-    def add(cond, val):
+@app.get("/audit-events")
+def list_events_v2(
+    actor_id: str | None = Query(None),
+    actor_name: str | None = Query(None),
+    operation: str | None = Query(None),
+    object_id: str | None = Query(None),
+    permission_id: int | None = Query(None),
+    date_from: str | None = Query(None, description="ISO8601 (p.ej. 2025-09-01T00:00:00Z)"),
+    date_to: str | None = Query(None, description="ISO8601"),
+    tz: str | None = Query(DEFAULT_TZ, description="Zona horaria de salida (p.ej. America/Bogota)"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+):
+    # 1) Query dinámica
+    q: List[str] = ["SELECT * FROM audit_events WHERE 1=1"]
+    p: List[Any] = []
+
+    def add(cond: str, val: Any):
         if val is not None:
-            q.append(cond); p.append(val)
+            q.append(cond)
+            p.append(val)
 
     add("AND actor_id = %s", actor_id)
-    add("AND operation = %s", operation)
-    add("AND module = %s", module)
-    add("AND object_type = %s", object_type)
+    add("AND actor_name ILIKE %s", f"%{actor_name}%" if actor_name else None)
+    add("AND operation = %s", operation.upper() if operation else None)
     add("AND object_id = %s", object_id)
-    add("AND LOWER(submodule) = LOWER(%s)", submodule)
-    add("AND LOWER(feature) = LOWER(%s)", feature)
-    add("AND meta->>'source' = %s", source)
+    add("AND permission_id = %s", permission_id)
     add("AND ts >= %s", date_from)
     add("AND ts <= %s", date_to)
-    add("AND permission_id = %s", permission_id)
 
     q.append("ORDER BY ts DESC LIMIT %s OFFSET %s")
     p.extend([limit, offset])
 
+    # 2) Ejecutar
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(" ".join(q), p)
         cols = [d[0] for d in cur.description]
         rows = [dict(zip(cols, r)) for r in cur.fetchall()]
 
-    return JSONResponse(content=jsonable_encoder(rows))
+    # 3) Conversión de zona horaria para salida
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        ts: datetime | None = r.get("ts")
+        if isinstance(ts, datetime):
+            ts_loc = _to_tz(ts, tz)
+            r["ts"] = ts_loc.isoformat()
+        # asegurar que diff siempre tenga las 3 claves (created/changed/removed) para claridad en la API
+        if "diff" in r and r["diff"] is not None:
+            try:
+                d = r["diff"]
+                # Normalizar forma mínima
+                d.setdefault("created", {})
+                d.setdefault("changed", {})
+                d.setdefault("removed", {})
+                r["diff"] = d
+            except Exception:
+                pass
+        out.append(r)
+
+    return JSONResponse(content=jsonable_encoder(out))
+
 
 @app.get("/healthz")
 def healthz():
