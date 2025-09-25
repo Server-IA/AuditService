@@ -26,7 +26,7 @@ app = FastAPI(title="Audit Service", version="2.0.0")
 
 # Helpers
 def _ensure_dt_utc(dt: datetime | None) -> datetime:
-    """Si viene None, ahora en UTC. Si viene naive, asumir UTC; si trae tz, convertir a UTC."""
+    """Si dt es None, retornar ahora en UTC. Si viene naive, asumir UTC; si trae tz, convertir a UTC."""
     if dt is None:
         return datetime.now(timezone.utc)
     if dt.tzinfo is None:
@@ -59,20 +59,46 @@ def ingest_v2(event: AuditEventIn, x_audit_token: str = Header(None)):
     if not operation:
         raise HTTPException(400, "operation es requerido")
 
-    diff_json = json.dumps(event.diff.model_dump() if event.diff else {"created": {}, "changed": {}, "removed": {}})
+    # 4) Preparar diff JSON (usar model_dump para pydantic v2)
+    try:
+        diff_obj = event.diff.model_dump() if event.diff else {"created": {}, "changed": {}, "removed": {}}
+    except Exception:
+        # fallback robusto
+        diff_obj = getattr(event, "diff", {"created": {}, "changed": {}, "removed": {}}) or {"created": {}, "changed": {}, "removed": {}}
+
+    # asegurar las claves mínimas
+    diff_obj.setdefault("created", {})
+    diff_obj.setdefault("changed", {})
+    diff_obj.setdefault("removed", {})
+
+    diff_json = json.dumps(diff_obj, default=str)
+
+    # preparar meta JSON (si viene)
+    try:
+        meta_obj = event.meta if getattr(event, "meta", None) is not None else {}
+    except Exception:
+        meta_obj = {}
+    # forzar a dict
+    if not isinstance(meta_obj, dict):
+        meta_obj = {}
+    meta_json = json.dumps(meta_obj, default=str)
+
     with get_conn() as conn, conn.cursor() as cur:
         # comprobar si existe la columna permission_description en audit_events
         cur.execute(
             """
-            SELECT 1
+            SELECT column_name
             FROM information_schema.columns
-            WHERE table_name = 'audit_events' AND column_name = 'permission_description'
-            LIMIT 1
+            WHERE table_name = 'audit_events'
+              AND column_name IN ('permission_description', 'meta')
             """
         )
-        has_perm_desc = cur.fetchone() is not None
+        cols_on_table = {row[0] for row in cur.fetchall()}  # set de columnas existentes
 
-        # columnas comunes
+        has_perm_desc = "permission_description" in cols_on_table
+        has_meta = "meta" in cols_on_table
+
+        # columnas comunes (orden intencional)
         cols = [
             "event_id", "ts",
             "actor_id", "actor_name", "actor_role",
@@ -96,12 +122,18 @@ def ingest_v2(event: AuditEventIn, x_audit_token: str = Header(None)):
             diff_json,
         ]
 
+        # Insertar permission_description si existe
         if has_perm_desc:
-            # insertar permission_description justo después de permission_id 
             insert_pos = cols.index("permission_id") + 1
             cols.insert(insert_pos, "permission_description")
             vals.insert(insert_pos, "%s")
             params.insert(insert_pos, event.permission_description)
+
+        # Insertar meta si existe (colocarlo al final para simplicidad)
+        if has_meta:
+            cols.append("meta")
+            vals.append("%s")
+            params.append(meta_json)
 
         sql = f"INSERT INTO audit_events ({', '.join(cols)}) VALUES ({', '.join(vals)})"
         cur.execute(sql, params)
@@ -149,24 +181,44 @@ def list_events_v2(
         cols = [d[0] for d in cur.description]
         rows = [dict(zip(cols, r)) for r in cur.fetchall()]
 
-    # 3) Conversión de zona horaria para salida
+    # 3) Conversión de zona horaria para salida y normalizaciones
     out: List[Dict[str, Any]] = []
     for r in rows:
         ts: datetime | None = r.get("ts")
         if isinstance(ts, datetime):
             ts_loc = _to_tz(ts, tz)
             r["ts"] = ts_loc.isoformat()
-        # asegurar que diff siempre tenga las 3 claves (created/changed/removed) para claridad en la API
+
+        # normalizar diff (aceptar string JSON o dict)
         if "diff" in r and r["diff"] is not None:
             try:
                 d = r["diff"]
-                # Normalizar forma mínima
+                if isinstance(d, str):
+                    d = json.loads(d)
                 d.setdefault("created", {})
                 d.setdefault("changed", {})
                 d.setdefault("removed", {})
                 r["diff"] = d
             except Exception:
                 pass
+
+        # normalizar meta (si existe y es string JSON)
+        if "meta" in r:
+            try:
+                m = r["meta"]
+                if m is None:
+                    r["meta"] = {}
+                elif isinstance(m, str):
+                    r["meta"] = json.loads(m)
+                elif isinstance(m, dict):
+                    # dejar tal cual
+                    r["meta"] = m
+                else:
+                    # cualquier otro tipo -> representar como {}
+                    r["meta"] = {}
+            except Exception:
+                r["meta"] = {}
+
         out.append(r)
 
     return JSONResponse(content=jsonable_encoder(out))
