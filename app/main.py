@@ -17,8 +17,14 @@ except Exception:
 
 from .schemas import AuditEventIn
 from .db import get_conn
+from dotenv import load_dotenv
 
-AUDIT_TOKEN = os.getenv("AUDIT_TOKEN", "devtoken")
+load_dotenv()
+
+AUDIT_TOKEN = os.getenv("AUDIT_TOKEN")
+if not AUDIT_TOKEN:
+    raise RuntimeError("AUDIT_TOKEN no está definido en el entorno")
+
 DEFAULT_TZ = os.getenv("AUDIT_LIST_TZ", "America/Bogota")  # Zona horaria por defecto para listados
 
 app = FastAPI(title="Audit Service", version="2.0.0")
