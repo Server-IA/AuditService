@@ -60,7 +60,7 @@ class AuditEventIn(BaseModel):
     # Operación & permiso
     operation: str
     permission_id: Optional[int] = None
-    permission_description: Optional[str] = None
+    # permission_description: Optional[str] = None
 
     # Diff
     diff: AuditDiff = Field(default_factory=AuditDiff)

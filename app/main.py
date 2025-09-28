@@ -90,18 +90,16 @@ def ingest_v2(event: AuditEventIn, x_audit_token: str = Header(None)):
     meta_json = json.dumps(meta_obj, default=str)
 
     with get_conn() as conn, conn.cursor() as cur:
-        # comprobar si existe la columna permission_description en audit_events
+        # comprobar si existe la columna meta en audit_events (no usamos permission_description)
         cur.execute(
             """
             SELECT column_name
             FROM information_schema.columns
             WHERE table_name = 'audit_events'
-              AND column_name IN ('permission_description', 'meta')
+              AND column_name = 'meta'
             """
         )
         cols_on_table = {row[0] for row in cur.fetchall()}  # set de columnas existentes
-
-        has_perm_desc = "permission_description" in cols_on_table
         has_meta = "meta" in cols_on_table
 
         # columnas comunes (orden intencional)
@@ -127,13 +125,6 @@ def ingest_v2(event: AuditEventIn, x_audit_token: str = Header(None)):
             event.permission_id,
             diff_json,
         ]
-
-        # Insertar permission_description si existe
-        if has_perm_desc:
-            insert_pos = cols.index("permission_id") + 1
-            cols.insert(insert_pos, "permission_description")
-            vals.insert(insert_pos, "%s")
-            params.insert(insert_pos, event.permission_description)
 
         # Insertar meta si existe (colocarlo al final para simplicidad)
         if has_meta:

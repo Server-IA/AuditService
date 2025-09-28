@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS audit_events (
     actor_name             TEXT NOT NULL,
     actor_role             TEXT NOT NULL,
     permission_id          BIGINT,
-    permission_description TEXT,
     operation              TEXT NOT NULL CHECK (operation IN ('CREATE','UPDATE','DELETE','READ','LOGIN','LOGOUT')),
     object_id              TEXT,
     ip                     INET,
