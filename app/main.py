@@ -90,7 +90,7 @@ def ingest_v2(event: AuditEventIn, x_audit_token: str = Header(None)):
     meta_json = json.dumps(meta_obj, default=str)
 
     with get_conn() as conn, conn.cursor() as cur:
-        # comprobar si existe la columna meta en audit_events (no usamos permission_description)
+        # comprobar si existe la columna meta en audit_events
         cur.execute(
             """
             SELECT column_name
