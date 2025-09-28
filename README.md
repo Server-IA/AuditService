@@ -138,96 +138,106 @@ curl -s "http://localhost:8070/audit-events\
 **Nota:**
 > Los atributos flexibles viven en meta (JSON). Estos son útiles en contextos de autenticación.
 - **Ejemplo:** <br>
-Inicio de sesión no exitoso:
+Inicio de sesión exitoso:
 ```json
   {
-    "event_id": "c08b14c6-ed8f-453b-ab64-3e7a584346c7",
-    "ts": "2025-09-16T06:07:33.527065+00:00",
-    "actor_id": null,
-    "actor_role": null,
-    "request_id": "4fb518f6-f211-4c89-a403-d195d19dba15",
+    "event_id": "293503b7-b022-4a86-9fdd-40950b6d7e25",
+    "ts": "2025-09-27T20:33:34.797275-05:00",
+    "actor_id": "1",
+    "actor_name": "felipe",
+    "actor_role": "administrador",
+    "permission_id": null,
+    "operation": "LOGIN",
+    "object_id": "1",
     "ip": "172.18.0.1",
-    "user_agent": "PostmanRuntime/7.46.0",
-    "module": "gestion_usuarios",
-    "submodule": "auth",
-    "feature": "login",
-    "object_type": "user",
-    "object_id": null,
-    "operation": "ACCESS",
-    "before": null,
-    "after": null,
-    "meta": { // justo aquí
+    "user_agent": "PostmanRuntime/7.47.1",
+    "diff": {
+      "changed": {},
+      "created": {},
+      "removed": {}
+    },
+    "meta": {
+      "result": "success",
+      "username_hint": "admin@example.com"
+    }
+  }
+```
+Inicio de sesión no exitoso (correo existente, contraseña incorrecta):
+```json
+  {
+    "event_id": "b5aaaf58-66a5-4db2-a705-30962be31395",
+    "ts": "2025-09-27T20:04:51.307012-05:00",
+    "actor_id": "1",
+    "actor_name": "felipe", // extrae actor_name
+    "actor_role": "administrador",
+    "permission_id": null,
+    "operation": "LOGIN",
+    "object_id": "1",
+    "ip": "172.18.0.1",
+    "user_agent": "PostmanRuntime/7.47.1",
+    "diff": {
+      "changed": {},
+      "created": {},
+      "removed": {}
+    },
+    "meta": {
       "reason": "invalid_credentials",
       "result": "failed",
-      "source": "auth.login",
-      "username_hint": "correo@usco.edu.co",
-      "actor_roles_ids": []
-    },
+      "username_hint": "admin@example.com"
+    }
+  }
+```
+
+Inicio de sesión no exitoso (correo NO existente):
+```json
+  {
+    "event_id": "accf0184-3833-4980-a85c-9c018750ba82",
+    "ts": "2025-09-27T20:38:01.992780-05:00",
+    "actor_id": "unknown", 
+    "actor_name": "unknown", // define "uknown" para actor_name
+    "actor_role": "unknown",
     "permission_id": null,
-    "diff": null
+    "operation": "LOGIN",
+    "object_id": null,
+    "ip": "172.18.0.1",
+    "user_agent": "PostmanRuntime/7.47.1",
+    "diff": {
+      "changed": {},
+      "created": {},
+      "removed": {}
+    },
+    "meta": {
+      "reason": "invalid_credentials",
+      "result": "failed",
+      "username_hint": "admin@example.com."
+    }
   }
 ```
 
 - Estructural de un evento 'UPDATE':
 ```json
-  {
-    "event_id": "6fae6134-7747-4006-916c-3d4124a12a30",
-    "ts": "2025-09-16T05:46:20.395532+00:00",
+    {
+    "event_id": "f9f36e07-6fb0-4477-901b-9596b1099daf",
+    "ts": "2025-09-27T20:34:12-05:00",
     "actor_id": "1",
+    "actor_name": "felipe",
     "actor_role": "administrador",
-    "request_id": "f7178180-e51a-47c0-87fd-8698ec00cb56",
-    "ip": "172.18.0.1",
-    "user_agent": "PostmanRuntime/7.46.0",
-    "module": "users management",
-    "submodule": "users",
-    "feature": "change_status",
-    "object_type": "user_status",
-    "object_id": "10",
+    "permission_id": 15,
     "operation": "UPDATE",
-    "before": {
-      "id": 10,
-      "name": "joseph",
-      "email": "tester123@gmail.com",
-      "roles": [
-        83
-      ],
-      "gender_id": 1,
-      "status_id": 1,
-      "first_last_name": "mendez",
-      "second_last_name": "vega"
-    },
-    "after": {
-      "id": 10,
-      "name": "joseph",
-      "email": "tester123@gmail.com",
-      "roles": [
-        83
-      ],
-      "gender_id": 1,
-      "status_id": 2,
-      "first_last_name": "mendez",
-      "second_last_name": "vega"
-    },
-    "meta": {
-      "source": "users.change_user_status",
-      "new_status": 2,
-      "actor_roles_ids": [
-        56,
-        32,
-        13,
-        14
-      ]
-    },
-    "permission_id": 10,
-    "diff": { // Permite obtener el campo(s) alterado o eliminado
+    "object_id": "16",
+    "ip": "172.18.0.1",
+    "user_agent": "PostmanRuntime/7.47.1",
+    "diff": {
       "changed": {
-        "status_id": {
-          "to": 2, // estado actual (luego de la transacción)
-          "from": 1 // estado anterior
+        "description": {
+          "to": "Responsable de auditorías.",
+          "from": "Responsable de la gestión de pruebas."
         }
       },
+      "created": {},
       "removed": {}
-    }
+    },
+    "meta": {}
   }
 ```
 
