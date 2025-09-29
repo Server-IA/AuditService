@@ -1,5 +1,5 @@
 -- =========================================
--- Audit schema (slim)
+-- Audit schema (slim) con module y submodule
 -- =========================================
 
 CREATE TABLE IF NOT EXISTS audit_events (
@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS audit_events (
     actor_name             TEXT NOT NULL,
     actor_role             TEXT NOT NULL,
     permission_id          BIGINT,
+    module                 TEXT, -- nuevo campo
+    submodule              TEXT, -- nuevo campo
     operation              TEXT NOT NULL CHECK (operation IN ('CREATE','UPDATE','DELETE','READ','LOGIN','LOGOUT')),
     object_id              TEXT,
     ip                     INET,
@@ -21,6 +23,8 @@ CREATE TABLE IF NOT EXISTS audit_events (
 CREATE INDEX IF NOT EXISTS idx_audit_events_ts             ON audit_events (ts DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_events_actor_id       ON audit_events (actor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_events_permission_id  ON audit_events (permission_id);
+CREATE INDEX IF NOT EXISTS idx_audit_events_module         ON audit_events (module);
+CREATE INDEX IF NOT EXISTS idx_audit_events_submodule      ON audit_events (submodule);
 CREATE INDEX IF NOT EXISTS idx_audit_events_operation      ON audit_events (operation);
 CREATE INDEX IF NOT EXISTS idx_audit_events_object_id      ON audit_events (object_id);
 

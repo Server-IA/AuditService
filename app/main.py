@@ -25,14 +25,13 @@ AUDIT_TOKEN = os.getenv("AUDIT_TOKEN")
 if not AUDIT_TOKEN:
     raise RuntimeError("AUDIT_TOKEN no está definido en el entorno")
 
-DEFAULT_TZ = os.getenv("AUDIT_LIST_TZ", "America/Bogota")  # Zona horaria por defecto para listados
+DEFAULT_TZ = os.getenv("AUDIT_LIST_TZ", "America/Bogota")
 
 app = FastAPI(title="Audit Service", version="2.0.0")
 
 
 # Helpers
 def _ensure_dt_utc(dt: datetime | None) -> datetime:
-    """Si dt es None, retornar ahora en UTC. Si viene naive, asumir UTC; si trae tz, convertir a UTC."""
     if dt is None:
         return datetime.now(timezone.utc)
     if dt.tzinfo is None:
@@ -41,7 +40,6 @@ def _ensure_dt_utc(dt: datetime | None) -> datetime:
 
 
 def _to_tz(dt: datetime, tz_name: str | None) -> datetime:
-    """Convierte un datetime aware (UTC) a tz de salida; si falla, deja UTC."""
     if tz_name and ZoneInfo:
         try:
             return dt.astimezone(ZoneInfo(tz_name))
@@ -52,45 +50,40 @@ def _to_tz(dt: datetime, tz_name: str | None) -> datetime:
 
 @app.post("/audit-events", status_code=202)
 def ingest_v2(event: AuditEventIn, x_audit_token: str = Header(None)):
-    # 1) Token
     if x_audit_token != AUDIT_TOKEN:
         raise HTTPException(401, "Invalid audit token")
 
-    # 2) ID y timestamp
     event_id = event.event_id or str(uuid.uuid4())
     ts_utc = _ensure_dt_utc(event.ts)
 
-    # 3) Normalizar operation
     operation = (event.operation or "").upper()
     if not operation:
         raise HTTPException(400, "operation es requerido")
 
-    # 4) Preparar diff JSON (usar model_dump para pydantic v2)
     try:
         diff_obj = event.diff.model_dump() if event.diff else {"created": {}, "changed": {}, "removed": {}}
     except Exception:
-        # fallback robusto
         diff_obj = getattr(event, "diff", {"created": {}, "changed": {}, "removed": {}}) or {"created": {}, "changed": {}, "removed": {}}
 
-    # asegurar las claves mínimas
     diff_obj.setdefault("created", {})
     diff_obj.setdefault("changed", {})
     diff_obj.setdefault("removed", {})
 
     diff_json = json.dumps(diff_obj, default=str)
 
-    # preparar meta JSON (si viene)
     try:
         meta_obj = event.meta if getattr(event, "meta", None) is not None else {}
     except Exception:
         meta_obj = {}
-    # forzar a dict
     if not isinstance(meta_obj, dict):
         meta_obj = {}
     meta_json = json.dumps(meta_obj, default=str)
 
     with get_conn() as conn, conn.cursor() as cur:
+<<<<<<< HEAD
         # comprobar si existe la columna meta en audit_events
+=======
+>>>>>>> ec3d817 (fix(auditoría): Añadir campos de module y submodule para habilitar uso en otros módulos)
         cur.execute(
             """
             SELECT column_name
@@ -99,16 +92,15 @@ def ingest_v2(event: AuditEventIn, x_audit_token: str = Header(None)):
               AND column_name = 'meta'
             """
         )
-        cols_on_table = {row[0] for row in cur.fetchall()}  # set de columnas existentes
+        cols_on_table = {row[0] for row in cur.fetchall()}
         has_meta = "meta" in cols_on_table
 
-        # columnas comunes (orden intencional)
         cols = [
             "event_id", "ts",
             "actor_id", "actor_name", "actor_role",
             "ip", "user_agent",
             "object_id", "operation",
-            "permission_id", "diff"
+            "permission_id", "module", "submodule", "diff"
         ]
         vals = ["%s"] * len(cols)
 
@@ -123,10 +115,11 @@ def ingest_v2(event: AuditEventIn, x_audit_token: str = Header(None)):
             event.object_id,
             operation,
             event.permission_id,
+            getattr(event, "module", None),
+            getattr(event, "submodule", None),
             diff_json,
         ]
 
-        # Insertar meta si existe (colocarlo al final para simplicidad)
         if has_meta:
             cols.append("meta")
             vals.append("%s")
@@ -146,13 +139,14 @@ def list_events_v2(
     operation: str | None = Query(None),
     object_id: str | None = Query(None),
     permission_id: int | None = Query(None),
+    module: str | None = Query(None),
+    submodule: str | None = Query(None),
     date_from: str | None = Query(None, description="ISO8601 (p.ej. 2025-09-01T00:00:00Z)"),
     date_to: str | None = Query(None, description="ISO8601"),
     tz: str | None = Query(DEFAULT_TZ, description="Zona horaria de salida (p.ej. America/Bogota)"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ):
-    # 1) Query dinámica
     q: List[str] = ["SELECT * FROM audit_events WHERE 1=1"]
     p: List[Any] = []
 
@@ -166,19 +160,19 @@ def list_events_v2(
     add("AND operation = %s", operation.upper() if operation else None)
     add("AND object_id = %s", object_id)
     add("AND permission_id = %s", permission_id)
+    add("AND module = %s", module)
+    add("AND submodule = %s", submodule)
     add("AND ts >= %s", date_from)
     add("AND ts <= %s", date_to)
 
     q.append("ORDER BY ts DESC LIMIT %s OFFSET %s")
     p.extend([limit, offset])
 
-    # 2) Ejecutar
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(" ".join(q), p)
         cols = [d[0] for d in cur.description]
         rows = [dict(zip(cols, r)) for r in cur.fetchall()]
 
-    # 3) Conversión de zona horaria para salida y normalizaciones
     out: List[Dict[str, Any]] = []
     for r in rows:
         ts: datetime | None = r.get("ts")
@@ -186,7 +180,6 @@ def list_events_v2(
             ts_loc = _to_tz(ts, tz)
             r["ts"] = ts_loc.isoformat()
 
-        # normalizar diff (aceptar string JSON o dict)
         if "diff" in r and r["diff"] is not None:
             try:
                 d = r["diff"]
@@ -199,7 +192,6 @@ def list_events_v2(
             except Exception:
                 pass
 
-        # normalizar meta (si existe y es string JSON)
         if "meta" in r:
             try:
                 m = r["meta"]
@@ -208,10 +200,8 @@ def list_events_v2(
                 elif isinstance(m, str):
                     r["meta"] = json.loads(m)
                 elif isinstance(m, dict):
-                    # dejar tal cual
                     r["meta"] = m
                 else:
-                    # cualquier otro tipo -> representar como {}
                     r["meta"] = {}
             except Exception:
                 r["meta"] = {}

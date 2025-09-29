@@ -8,9 +8,9 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator, model_valida
 class AuditDiff(BaseModel):
     """
     Nuevo diff v2 extendido que incluye:
-      - created: objetos totalmente nuevos (sin "from")
-      - changed: campos modificados { field: {"from": X, "to": Y}, ... }
-      - removed: campos eliminados { field: <valor_anterior>, ... }
+        - created: objetos totalmente nuevos (sin "from")
+        - changed: campos modificados { field: {"from": X, "to": Y}, ... }
+        - removed: campos eliminados { field: <valor_anterior>, ... }
 
     Se fuerza que los tres sean diccionarios y por defecto vacíos.
     """
@@ -60,7 +60,8 @@ class AuditEventIn(BaseModel):
     # Operación & permiso
     operation: str
     permission_id: Optional[int] = None
-    # permission_description: Optional[str] = None
+    module: Optional[str] = None       # nuevo campo
+    submodule: Optional[str] = None    # nuevo campo
 
     # Diff
     diff: AuditDiff = Field(default_factory=AuditDiff)
@@ -75,7 +76,6 @@ class AuditEventIn(BaseModel):
     @field_validator("ts", mode="before")
     @classmethod
     def _parse_ts(cls, v):
-        # mantener compatibilidad con strings ISO y datetime; asumir UTC si es naive
         if v is None:
             return None
         if isinstance(v, datetime):
@@ -92,14 +92,11 @@ class AuditEventIn(BaseModel):
 
     @model_validator(mode="after")
     def _required_actor_fields(self) -> "AuditEventIn":
-        # Campos actor obligatorios no vacíos
         for f in ("actor_id", "actor_name", "actor_role"):
             if not getattr(self, f, None):
                 raise ValueError(f"{f} es requerido.")
-        # Asegurar diff tiene la forma correcta (AuditDiff ya valida, esto es redundante pero seguro)
         if not isinstance(self.diff, AuditDiff):
             raise ValueError("diff inválido.")
-        # meta debe ser dict si viene
         if self.meta is None:
             self.meta = {}
         elif not isinstance(self.meta, dict):
