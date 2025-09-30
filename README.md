@@ -89,77 +89,179 @@ Desde el directorio del repositorio ejecutar el siguiente comando:
 docker-compose up --build -d
 ```
 
-## 6. Anexos:
+## 6. Contexto de uso y alcance:
+El microservico de auditoría contempla las siguientes acciones:
 
-- Conexión al container de la db:
-```bash
-docker exec -it auditservice-audit-db-1 psql -U audit
+```rb
+Create role 
+Create permission 
+Edit role 
+Change rol status 
+Update user roles 
+Update rol permissions 
+Assign role 
+Revoke rol 
+Delete rol 
+
+Create user by admin 
+Complete pre register (validate doc) [?]
+Complete pre register [?]
+Activate account [?]
+Edit profile 
+Editar información completa del usuario (como Admin) 
+
+Change user status 
+Change password 
+
+Admin/User auth login 
+Update password via token [?]
+
+Request reset password [?]
 ```
+**NOTA:**
+> Para las acciones que al final de la línea tienen un **"[?]"**, no se incluye información del actor (actor_id, rol_id) y del permiso (permission_id), debido a que no hay contexto de autenticación y/o permiso contemplado en las respectivas funciones.
+
+### Filtros (query parameters)
+El microservicio permite filtrar resultados de manera directa a través los siguientes parámetros:
+
+	•	actor_id — ID del actor que ejecutó la acción (string).
+	•	operation — Tipo de operación (ACCESS, CREATE, UPDATE, DELETE, etc.).
+	•	module — Módulo canónico (ej. users_management).
+	•	submodule — Submódulo (ej. roles, users, auth).
+	•	feature — Acción/feature (ej. login, create, edit, change_user_password).
+	•	object_type — Tipo de objeto (ej. user, role, permission).
+	•	object_id — ID del objeto afectado (string).
+	•	source — Atajo para meta->>'source' (ej. roles.edit_role, auth.login).
+	•	permission_id — ID del permiso bajo el cual se ejecutó la acción (int).
+	•	date_from — ISO 8601 (inclusive). Filtra ts >= date_from.
+	•	date_to — ISO 8601 (inclusive). Filtra ts <= date_to.
+	•	limit — Límite de filas (por defecto 100).
+	•	offset — Desplazamiento para paginación (por defecto 0).
 
 - Endpoint base de API para consulta de eventos:
 http://localhost:8002/audit-events
 
-- Estructural del evento (JSON):
+ - **Ejemplo**: <br>
+ Búsqueda con filtros anidados:
+ ```bash
+curl -s "http://localhost:8070/audit-events\
+?operation=UPDATE\
+&submodule=roles\
+&feature=edit\
+&permission_id=15\
+&actor_id=11\
+&date_from=2025-09-16T00:00:00Z"
+```
+**Nota:**
+> Los atributos flexibles viven en meta (JSON). Estos son útiles en contextos de autenticación.
+- **Ejemplo:** <br>
+Inicio de sesión exitoso:
 ```json
   {
-    "event_id": "6fae6134-7747-4006-916c-3d4124a12a30",
-    "ts": "2025-09-16T05:46:20.395532+00:00",
+    "event_id": "293503b7-b022-4a86-9fdd-40950b6d7e25",
+    "ts": "2025-09-27T20:33:34.797275-05:00",
     "actor_id": "1",
+    "actor_name": "felipe",
     "actor_role": "administrador",
-    "request_id": "f7178180-e51a-47c0-87fd-8698ec00cb56",
+    "permission_id": null,
+    "operation": "LOGIN",
+    "object_id": "1",
     "ip": "172.18.0.1",
-    "user_agent": "PostmanRuntime/7.46.0",
-    "module": "users management",
-    "submodule": "users",
-    "feature": "change_status",
-    "object_type": "user_status",
-    "object_id": "10",
-    "operation": "UPDATE",
-    "before": {
-      "id": 10,
-      "name": "joseph",
-      "email": "tester123@gmail.com",
-      "roles": [
-        83
-      ],
-      "gender_id": 1,
-      "status_id": 1,
-      "first_last_name": "mendez",
-      "second_last_name": "vega"
-    },
-    "after": {
-      "id": 10,
-      "name": "joseph",
-      "email": "tester123@gmail.com",
-      "roles": [
-        83
-      ],
-      "gender_id": 1,
-      "status_id": 2,
-      "first_last_name": "mendez",
-      "second_last_name": "vega"
+    "user_agent": "PostmanRuntime/7.47.1",
+    "diff": {
+      "changed": {},
+      "created": {},
+      "removed": {}
     },
     "meta": {
-      "source": "users.change_user_status",
-      "new_status": 2,
-      "actor_roles_ids": [
-        56,
-        32,
-        13,
-        14
-      ]
-    },
-    "permission_id": 10,
-    "diff": {
-      "changed": {
-        "status_id": {
-          "to": 2,
-          "from": 1
-        }
-      },
-      "removed": {}
+      "result": "success",
+      "username_hint": "admin@example.com"
     }
   }
+```
+Inicio de sesión no exitoso (correo existente, contraseña incorrecta):
+```json
+  {
+    "event_id": "b5aaaf58-66a5-4db2-a705-30962be31395",
+    "ts": "2025-09-27T20:04:51.307012-05:00",
+    "actor_id": "1",
+    "actor_name": "felipe",
+    "actor_role": "administrador",
+    "permission_id": null,
+    "operation": "LOGIN",
+    "object_id": "1",
+    "ip": "172.18.0.1",
+    "user_agent": "PostmanRuntime/7.47.1",
+    "diff": {
+      "changed": {},
+      "created": {},
+      "removed": {}
+    },
+    "meta": {
+      "reason": "invalid_credentials",
+      "result": "failed",
+      "username_hint": "admin@example.com"
+    }
+  }
+```
+
+Inicio de sesión no exitoso (correo NO existente):
+```json
+  {
+    "event_id": "accf0184-3833-4980-a85c-9c018750ba82",
+    "ts": "2025-09-27T20:38:01.992780-05:00",
+    "actor_id": "unknown", 
+    "actor_name": "unknown",
+    "actor_role": "unknown",
+    "permission_id": null,
+    "operation": "LOGIN",
+    "object_id": null,
+    "ip": "172.18.0.1",
+    "user_agent": "PostmanRuntime/7.47.1",
+    "diff": {
+      "changed": {},
+      "created": {},
+      "removed": {}
+    },
+    "meta": {
+      "reason": "invalid_credentials",
+      "result": "failed",
+      "username_hint": "admin@example.com."
+    }
+  }
+```
+
+- Estructural de un evento 'UPDATE':
+```json
+    {
+    "event_id": "f9f36e07-6fb0-4477-901b-9596b1099daf",
+    "ts": "2025-09-27T20:34:12-05:00",
+    "actor_id": "1",
+    "actor_name": "felipe",
+    "actor_role": "administrador",
+    "permission_id": 15,
+    "operation": "UPDATE",
+    "object_id": "16",
+    "ip": "172.18.0.1",
+    "user_agent": "PostmanRuntime/7.47.1",
+    "diff": {
+      "changed": {
+        "description": {
+          "to": "Responsable de auditorías.",
+          "from": "Responsable de la gestión de pruebas."
+        }
+      },
+      "created": {},
+      "removed": {}
+    },
+    "meta": {}
+  }
+```
+
+## 7. Anexos:
+- Conexión al container de la db:
+```bash
+docker exec -it auditservice-audit-db-1 psql -U audit
 ```
 
 ## [+]. Consideraciones Finales
