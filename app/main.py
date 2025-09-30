@@ -93,10 +93,6 @@ def ingest_v2(event: AuditEventIn, x_audit_token: str = Header(None)):
     meta_json = json.dumps(meta_obj, default=str)
 
     with get_conn() as conn, conn.cursor() as cur:
-<<<<<<< HEAD
-        # comprobar si existe la columna meta en audit_events
-=======
->>>>>>> ec3d817 (fix(auditoría): Añadir campos de module y submodule para habilitar uso en otros módulos)
         cur.execute(
             """
             SELECT column_name
