@@ -48,6 +48,19 @@ def _to_tz(dt: datetime, tz_name: str | None) -> datetime:
     return dt
 
 
+# Configuración de CORS para permitir acceso desde cualquier origen
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        os.getenv("FRONTEND_PRUEBAS_URL"),
+        os.getenv("FRONTEND_URL"),
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+)
+
 @app.post("/audit-events", status_code=202)
 def ingest_v2(event: AuditEventIn, x_audit_token: str = Header(None)):
     if x_audit_token != AUDIT_TOKEN:

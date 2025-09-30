@@ -26,12 +26,12 @@ Copia el archivo `.env.example` a `.env` y ajusta los valores:
 **Desde el proyecto que consumirá el microservicio (UsersMachPay), adicionar:**
 ```dotenv
 SERVICE_NAME=users
-AUDIT_URL=http://audit-service:8000/audit-events
+AUDIT_URL=http://audit-service:8002/audit-events
 AUDIT_TOKEN=devtoken
 AUDIT_HTTP_TIMEOUT=1.5
 ```
 
-**Desde el microservicio (AuditService):**
+**Desde el microservicio para la rama main (AuditService):**
 ```dotenv
 # INTERNAL CONTAINER
 AUDIT_DB_DSN=postgresql://audit:audit@audit-db:5432/audit
@@ -43,6 +43,23 @@ AUDIT_TOKEN=devtoken
 POSTGRES_DB=audit
 POSTGRES_USER=audit
 POSTGRES_PASSWORD=audit
+```
+**Desde el microservicio para la rama auditBackend (AuditService):**
+```dotenv
+# INTERNAL CONTAINER
+AUDIT_DB_DSN=postgresql://postgres:root1234.@machpay_db:5432/auditdb
+
+# AUTH API 
+AUDIT_TOKEN=devtoken
+
+# POSTGRES VARS
+POSTGRES_DB=auditdb
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=root1234.
+
+# FRONT SERVICE
+FRONTEND_PRUEBAS_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:3000
 ```
 
 ## 3. Crear la Red de Docker
@@ -121,8 +138,8 @@ El microservicio permite filtrar resultados de manera directa a través los sigu
 	•	limit — Límite de filas (por defecto 100).
 	•	offset — Desplazamiento para paginación (por defecto 0).
 
- - Endpoint base de API para consulta de eventos:
-http://localhost:8070/audit-events
+- Endpoint base de API para consulta de eventos:
+http://localhost:8002/audit-events
 
  - **Ejemplo**: <br>
  Búsqueda con filtros anidados:
@@ -168,7 +185,7 @@ Inicio de sesión no exitoso (correo existente, contraseña incorrecta):
     "event_id": "b5aaaf58-66a5-4db2-a705-30962be31395",
     "ts": "2025-09-27T20:04:51.307012-05:00",
     "actor_id": "1",
-    "actor_name": "felipe", // extrae actor_name
+    "actor_name": "felipe",
     "actor_role": "administrador",
     "permission_id": null,
     "operation": "LOGIN",
@@ -194,7 +211,7 @@ Inicio de sesión no exitoso (correo NO existente):
     "event_id": "accf0184-3833-4980-a85c-9c018750ba82",
     "ts": "2025-09-27T20:38:01.992780-05:00",
     "actor_id": "unknown", 
-    "actor_name": "unknown", // define "uknown" para actor_name
+    "actor_name": "unknown",
     "actor_role": "unknown",
     "permission_id": null,
     "operation": "LOGIN",
