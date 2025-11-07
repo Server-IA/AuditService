@@ -144,7 +144,7 @@ def ingest_v2(event: AuditEventIn, x_audit_token: str = Header(None)):
 
 @app.get("/audit-events")
 def list_events_v2(
-    current_user: dict = Depends(require_permission(300)),  # 300 = audit.logs.view
+    current_user: dict = Depends(require_permission(1)),  # 1 = audit.logs.view
     actor_id: str | None = Query(None),
     actor_name: str | None = Query(None),
     operation: str | None = Query(None),
