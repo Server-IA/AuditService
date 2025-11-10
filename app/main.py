@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone
 from typing import List, Dict, Any
 
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query, Depends
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
@@ -17,6 +17,7 @@ except Exception:
 
 from .schemas import AuditEventIn
 from .db import get_conn
+from .auth import AuthService, check_permission, require_permission, PermissionDenied
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,6 +29,19 @@ if not AUDIT_TOKEN:
 DEFAULT_TZ = os.getenv("AUDIT_LIST_TZ", "America/Bogota")
 
 app = FastAPI(title="Audit Service", version="2.0.0")
+
+
+# Manejador de excepciones personalizado para PermissionDenied
+@app.exception_handler(PermissionDenied)
+async def permission_denied_handler(request, exc: PermissionDenied):
+    """Maneja excepciones de permisos denegados con formato personalizado."""
+    return JSONResponse(
+        status_code=403,
+        content={
+            "status": False,
+            "message": exc.message
+        }
+    )
 
 
 # Helpers
@@ -143,6 +157,7 @@ def ingest_v2(event: AuditEventIn, x_audit_token: str = Header(None)):
 
 @app.get("/audit-events")
 def list_events_v2(
+    current_user: dict = Depends(require_permission(1)),  # 1 = audit.logs.view
     actor_id: str | None = Query(None),
     actor_name: str | None = Query(None),
     operation: str | None = Query(None),
@@ -156,6 +171,35 @@ def list_events_v2(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ):
+    """
+    Lista eventos de auditoría con filtros opcionales.
+        
+    Args:
+        current_user: Usuario autenticado (inyectado automáticamente)
+        actor_id: Filtrar por ID del actor
+        actor_name: Filtrar por nombre del actor (búsqueda parcial)
+        operation: Filtrar por tipo de operación (CREATE, UPDATE, DELETE, etc.)
+        object_id: Filtrar por ID del objeto afectado
+        permission_id: Filtrar por ID del permiso usado
+        module: Filtrar por módulo
+        submodule: Filtrar por submódulo
+        date_from: Fecha inicial (ISO8601)
+        date_to: Fecha final (ISO8601)
+        tz: Zona horaria para mostrar fechas (default: America/Bogota)
+        limit: Cantidad máxima de resultados (1-1000)
+        offset: Número de registros a omitir (paginación)
+        
+    Returns:
+        JSONResponse: Lista de eventos de auditoría
+        
+    Raises:
+        HTTPException 401: Si el token es inválido o expirado
+        HTTPException 403: Si el usuario no tiene el permiso requerido
+        
+    Example:
+        GET /audit-events?operation=CREATE&limit=50&offset=0
+        Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+    """
     q: List[str] = ["SELECT * FROM audit_events WHERE 1=1"]
     p: List[Any] = []
 
