@@ -44,7 +44,7 @@ async def permission_denied_handler(request, exc: PermissionDenied):
     )
 
 
-# Helpers
+# Helpers - logic
 def _ensure_dt_utc(dt: datetime | None) -> datetime:
     if dt is None:
         return datetime.now(timezone.utc)
