@@ -31,6 +31,7 @@ AUDIT_TOKEN=devtoken
 AUDIT_HTTP_TIMEOUT=1.5
 ```
 
+
 **Desde el microservicio (AuditService):**
 ```dotenv
 # INTERNAL CONTAINER
