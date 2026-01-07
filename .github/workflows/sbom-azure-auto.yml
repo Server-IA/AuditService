@@ -1,24 +1,18 @@
-name: Universal Security Pipeline
+name: SBOM Auto-Deploy (Dynamic Firewall)
 
 on:
   push:
-    branches: [ "main" ]       # Carril 2 (Espejo)
-    tags: [ "v*" ]             # Carril 3 (Producción)
-  pull_request:
-    branches: [ "main" ]       # Carril 1 (Filtro)
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 env:
-  # --- CONFIGURACIÓN BASE ---
   AZURE_RESOURCE_GROUP: "rg-scaowaspdeptrack-qa-eastus2"
   AZURE_NSG_NAME: "vm-scaowaspdeptrack-qa-eastus2-nsg"
-  DEPENDENCY_TRACK_HOST: "https://dtrack-indigotech.eastus2.cloudapp.azure.com"
-  
-  # DEFINIR TIPO DE APP: Cambia a "WEB" o "DESKTOP" según el repo
-  APP_TYPE: "WEB" 
+  DEPENDENCY_TRACK_HOST: "https://dtrack.indigotech.eastus2.cloudapp.azure.com"
   PROJECT_NAME: "Indira Viewer"
 
 jobs:
-  security-analysis:
+  sbom-process:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -28,55 +22,58 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # 🧠 EL CEREBRO: Decide el nombre de la versión automáticamente
-      - name: Determine Version Logic
-        run: |
-          # CASO 1: Es un Pull Request (Carril 1)
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "Modo: PREVENCIÓN"
-            echo "DT_VERSION=CI-Check-${{ github.head_ref }}" >> $GITHUB_ENV
-            echo "AUTO_CREATE=false" >> $GITHUB_ENV # Opcional: No crear proyecto si no existe
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-          # CASO 2: Es la rama Main (Carril 2)
-          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "Modo: ESPEJO (Main)"
-            echo "DT_VERSION=main" >> $GITHUB_ENV
-            echo "AUTO_CREATE=true" >> $GITHUB_ENV
-
-          # CASO 3: Es un Tag/Release (Carril 3)
-          elif [[ "${{ github.ref }}" == "refs/tags/"* ]]; then
-            TAG_NAME=${GITHUB_REF#refs/tags/}
-            echo "Modo: PRODUCCIÓN detectado. Tipo de App: ${{ env.APP_TYPE }}"
+      # --- AQUÍ ESTÁ EL ARREGLO ---
+      - name: Open Firewall Rule
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            IP=$(curl -s https://api.ipify.org)
+            echo "Runner IP: $IP"
             
-            if [[ "${{ env.APP_TYPE }}" == "WEB" ]]; then
-               # Si es Web, siempre se llama "Production" (Sobrescribe)
-               echo "DT_VERSION=Production" >> $GITHUB_ENV
-            else
-               # Si es Escritorio, usa el nombre del tag (v1.0, v2.0...)
-               echo "DT_VERSION=$TAG_NAME" >> $GITHUB_ENV
-            fi
-            echo "AUTO_CREATE=true" >> $GITHUB_ENV
-          fi
+            # 1. Crear la regla
+            az network nsg rule create \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --nsg-name ${{ env.AZURE_NSG_NAME }} \
+              --name AllowGitHubRunner-${{ github.run_id }} \
+              --priority 1000 \
+              --source-address-prefixes $IP \
+              --destination-port-ranges 443 \
+              --access Allow \
+              --protocol Tcp \
+              --description "Acceso temporal GitHub Run ${{ github.run_id }}"
+            
+            # 2. ESPERAR A AZURE (La cura para el error)
+            echo "Regla creada. Esperando 60 segundos para propagación..."
+            sleep 60
 
-      # ... (Aquí irían tus pasos de Azure Login, Firewall Open y Setup Node) ...
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
 
       - name: Generate SBOM
         run: |
           npm install -g @cyclonedx/cdxgen
           cdxgen . -o bom.xml --project-name "${{ env.PROJECT_NAME }}"
+          ls -lh bom.xml
 
-      - name: Upload to Dependency-Track
+      - name: Upload Report
         run: |
-          echo "Subiendo a Proyecto: ${{ env.PROJECT_NAME }} - Versión: ${{ env.DT_VERSION }}"
-          curl -X POST "${{ env.DEPENDENCY_TRACK_HOST }}/api/v1/bom" \
+          echo "Enviando a ${{ env.DEPENDENCY_TRACK_HOST }}..."
+          # Agregamos --verbose (-v) para ver más detalles si falla
+          curl -v -X POST "${{ env.DEPENDENCY_TRACK_HOST }}/api/v1/bom" \
             -H "Content-Type: multipart/form-data" \
             -H "X-Api-Key: ${{ secrets.DTRACK_KEY }}" \
-            -F "autoCreate=${{ env.AUTO_CREATE }}" \
+            -F "autoCreate=true" \
             -F "projectName=${{ env.PROJECT_NAME }}" \
-            -F "projectVersion=${{ env.DT_VERSION }}" \
+            -F "projectVersion=${{ github.sha }}" \
             -F "bom=@bom.xml"
 
-      # 7. Cerrar Firewall (Se ejecuta SIEMPRE
       - name: Close Firewall Rule
         if: always()
         uses: azure/CLI@v1
