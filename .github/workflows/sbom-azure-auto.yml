@@ -10,7 +10,7 @@ env:
   # ⚠️ ZONA DE EDICIÓN: CAMBIA ESTOS 4 VALORES POR LOS TUYOS
   # ==============================================================================
   AZURE_RESOURCE_GROUP: "rg-scaowaspdeptrack-qa-eastus2"    # Ej: rg-appsec-deptrack-01
-  AZURE_NSG_NAME: "rg-scaowaspdeptrack-qa-eastus2-nsg"            # Ej: vm-deptrack-nsg (El escudo azul)
+  AZURE_NSG_NAME: "vm-scaowaspdeptrack-qa-eastus2-nsg"            # Ej: vm-deptrack-nsg (El escudo azul)
   DEPENDENCY_TRACK_HOST: "https://dtrack-indigotech.eastus2.cloudapp.azure.com" # Ej: http://20.50.60.70:8080
   PROJECT_NAME: "POC-Automatizacion"          
   # ==============================================================================
