@@ -1,0 +1,91 @@
+name: SBOM Auto-Deploy (Dynamic Firewall)
+
+on:
+  push:
+    branches: [ "main", "master" ] # Se activa al subir cambios
+  workflow_dispatch: # Te permite ejecutarlo manualmente con un botón click
+
+env:
+  # ==============================================================================
+  # ⚠️ ZONA DE EDICIÓN: CAMBIA ESTOS 4 VALORES POR LOS TUYOS
+  # ==============================================================================
+  AZURE_RESOURCE_GROUP: "rg-scaowaspdeptrack-qa-eastus2"    # Ej: rg-appsec-deptrack-01
+  AZURE_NSG_NAME: "rg-scaowaspdeptrack-qa-eastus2-nsg"            # Ej: vm-deptrack-nsg (El escudo azul)
+  DEPENDENCY_TRACK_HOST: "https://dtrack-indigotech.eastus2.cloudapp.azure.com" # Ej: http://20.50.60.70:8080
+  PROJECT_NAME: "POC-Automatizacion"            # Nombre del proyecto en el Dashboard
+  # ==============================================================================
+
+jobs:
+  sbom-process:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Necesario para el login de Azure
+
+    steps:
+      # 1. Bajar tu código fuente
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # 2. Iniciar sesión en Azure (Usa el secreto JSON que guardaste)
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # 3. Abrir el Firewall (Dynamic Whitelisting)
+      # NOTA: Este paso fallará si aun no te han dado el rol de Owner/User Access Admin
+      - name: Open Firewall Rule
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            IP=$(curl -s https://api.ipify.org)
+            echo "Runner IP: $IP"
+            az network nsg rule create \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --nsg-name ${{ env.AZURE_NSG_NAME }} \
+              --name AllowGitHubRunner-${{ github.run_id }} \
+              --priority 1000 \
+              --source-address-prefixes $IP \
+              --destination-port-ranges 443 \
+              --access Allow \
+              --protocol Tcp \
+              --description "Acceso temporal GitHub Run ${{ github.run_id }}"
+
+      # 4. Preparar entorno para generar SBOM
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      # 5. Generar SBOM (Universal con cdxgen)
+      - name: Generate SBOM
+        run: |
+          npm install -g @cyclonedx/cdxgen
+          # Escanea el directorio actual (.) y guarda en bom.xml
+          cdxgen . -o bom.xml --project-name "${{ env.PROJECT_NAME }}"
+          ls -lh bom.xml # Muestra el archivo en logs para confirmar
+
+      # 6. Enviar a Dependency-Track (Usa la API Key que guardaste)
+      - name: Upload Report
+        run: |
+          echo "Enviando a ${{ env.DEPENDENCY_TRACK_HOST }}..."
+          curl -X POST "${{ env.DEPENDENCY_TRACK_HOST }}/api/v1/bom" \
+            -H "Content-Type: multipart/form-data" \
+            -H "X-Api-Key: ${{ secrets.DTRACK_KEY }}" \
+            -F "autoCreate=true" \
+            -F "projectName=${{ env.PROJECT_NAME }}" \
+            -F "projectVersion=${{ github.sha }}" \
+            -F "bom=@bom.xml"
+
+      # 7. Cerrar Firewall (Se ejecuta SIEMPRE, falle o no lo anterior)
+      - name: Close Firewall Rule
+        if: always()
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            echo "Cerrando acceso..."
+            az network nsg rule delete \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --nsg-name ${{ env.AZURE_NSG_NAME }} \
+              --name AllowGitHubRunner-${{ github.run_id }}
