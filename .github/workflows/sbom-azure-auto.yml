@@ -78,7 +78,7 @@ jobs:
             -F "projectVersion=${{ github.sha }}" \
             -F "bom=@bom.xml"
 
-      # 7. Cerrar Firewall (Se ejecuta SIEMPRE, falle o no lo anterior)
+      # 7. Cerrar Firewall (Se ejecuta SIEMPRE
       - name: Close Firewall Rule
         if: always()
         uses: azure/CLI@v1
