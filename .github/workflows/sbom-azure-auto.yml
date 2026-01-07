@@ -1,81 +1,79 @@
-name: SBOM Auto-Deploy (Dynamic Firewall)
+name: Universal Security Pipeline
 
 on:
   push:
-    branches: [ "main", "master" ] # Se activa al subir cambios
-  workflow_dispatch: # Te permite ejecutarlo manualmente con un botón click
+    branches: [ "main" ]       # Carril 2 (Espejo)
+    tags: [ "v*" ]             # Carril 3 (Producción)
+  pull_request:
+    branches: [ "main" ]       # Carril 1 (Filtro)
 
 env:
-  # ==============================================================================
-  # ⚠️ ZONA DE EDICIÓN: CAMBIA ESTOS 4 VALORES POR LOS TUYOS
-  # ==============================================================================
-  AZURE_RESOURCE_GROUP: "rg-scaowaspdeptrack-qa-eastus2"    # Ej: rg-appsec-deptrack-01
-  AZURE_NSG_NAME: "vm-scaowaspdeptrack-qa-eastus2-nsg"            # Ej: vm-deptrack-nsg (El escudo azul)
-  DEPENDENCY_TRACK_HOST: "https://dtrack-indigotech.eastus2.cloudapp.azure.com" # Ej: http://20.50.60.70:8080
-  PROJECT_NAME: "POC-Automatizacion"          
-  # ==============================================================================
+  # --- CONFIGURACIÓN BASE ---
+  AZURE_RESOURCE_GROUP: "rg-scaowaspdeptrack-qa-eastus2"
+  AZURE_NSG_NAME: "vm-scaowaspdeptrack-qa-eastus2-nsg"
+  DEPENDENCY_TRACK_HOST: "https://dtrack-indigotech.eastus2.cloudapp.azure.com"
+  
+  # DEFINIR TIPO DE APP: Cambia a "WEB" o "DESKTOP" según el repo
+  APP_TYPE: "WEB" 
+  PROJECT_NAME: "Indira Viewer"
 
 jobs:
-  sbom-process:
+  security-analysis:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # Necesario para el login de Azure
+      id-token: write
 
     steps:
-      # 1. Bajar tu código fuente
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # 2. Iniciar sesión en Azure (Usa el secreto JSON que guardaste)
-      - name: Azure Login
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      # 🧠 EL CEREBRO: Decide el nombre de la versión automáticamente
+      - name: Determine Version Logic
+        run: |
+          # CASO 1: Es un Pull Request (Carril 1)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "Modo: PREVENCIÓN"
+            echo "DT_VERSION=CI-Check-${{ github.head_ref }}" >> $GITHUB_ENV
+            echo "AUTO_CREATE=false" >> $GITHUB_ENV # Opcional: No crear proyecto si no existe
 
-      # 3. Abrir el Firewall (Dynamic Whitelisting)
-      # NOTA: Este paso fallará si aun no te han dado el rol de Owner/User Access Admin
-      - name: Open Firewall Rule
-        uses: azure/CLI@v1
-        with:
-          inlineScript: |
-            IP=$(curl -s https://api.ipify.org)
-            echo "Runner IP: $IP"
-            az network nsg rule create \
-              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-              --nsg-name ${{ env.AZURE_NSG_NAME }} \
-              --name AllowGitHubRunner-${{ github.run_id }} \
-              --priority 1000 \
-              --source-address-prefixes $IP \
-              --destination-port-ranges 443 \
-              --access Allow \
-              --protocol Tcp \
-              --description "Acceso temporal GitHub Run ${{ github.run_id }}"
+          # CASO 2: Es la rama Main (Carril 2)
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "Modo: ESPEJO (Main)"
+            echo "DT_VERSION=main" >> $GITHUB_ENV
+            echo "AUTO_CREATE=true" >> $GITHUB_ENV
 
-      # 4. Preparar entorno para generar SBOM
-      - name: Setup Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
+          # CASO 3: Es un Tag/Release (Carril 3)
+          elif [[ "${{ github.ref }}" == "refs/tags/"* ]]; then
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+            echo "Modo: PRODUCCIÓN detectado. Tipo de App: ${{ env.APP_TYPE }}"
+            
+            if [[ "${{ env.APP_TYPE }}" == "WEB" ]]; then
+               # Si es Web, siempre se llama "Production" (Sobrescribe)
+               echo "DT_VERSION=Production" >> $GITHUB_ENV
+            else
+               # Si es Escritorio, usa el nombre del tag (v1.0, v2.0...)
+               echo "DT_VERSION=$TAG_NAME" >> $GITHUB_ENV
+            fi
+            echo "AUTO_CREATE=true" >> $GITHUB_ENV
+          fi
 
-      # 5. Generar SBOM (Universal con cdxgen)
+      # ... (Aquí irían tus pasos de Azure Login, Firewall Open y Setup Node) ...
+
       - name: Generate SBOM
         run: |
           npm install -g @cyclonedx/cdxgen
-          # Escanea el directorio actual (.) y guarda en bom.xml
           cdxgen . -o bom.xml --project-name "${{ env.PROJECT_NAME }}"
-          ls -lh bom.xml # Muestra el archivo en logs para confirmar
 
-      # 6. Enviar a Dependency-Track (Usa la API Key que guardaste)
-      - name: Upload Report
+      - name: Upload to Dependency-Track
         run: |
-          echo "Enviando a ${{ env.DEPENDENCY_TRACK_HOST }}..."
+          echo "Subiendo a Proyecto: ${{ env.PROJECT_NAME }} - Versión: ${{ env.DT_VERSION }}"
           curl -X POST "${{ env.DEPENDENCY_TRACK_HOST }}/api/v1/bom" \
             -H "Content-Type: multipart/form-data" \
             -H "X-Api-Key: ${{ secrets.DTRACK_KEY }}" \
-            -F "autoCreate=true" \
+            -F "autoCreate=${{ env.AUTO_CREATE }}" \
             -F "projectName=${{ env.PROJECT_NAME }}" \
-            -F "projectVersion=${{ github.sha }}" \
+            -F "projectVersion=${{ env.DT_VERSION }}" \
             -F "bom=@bom.xml"
 
       # 7. Cerrar Firewall (Se ejecuta SIEMPRE
