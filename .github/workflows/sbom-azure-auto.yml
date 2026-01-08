@@ -27,7 +27,6 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # --- AQUÍ ESTÁ EL ARREGLO ---
       - name: Open Firewall Rule
         uses: azure/CLI@v1
         with:
