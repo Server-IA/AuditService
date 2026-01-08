@@ -242,6 +242,8 @@ Inicio de sesión no exitoso (correo NO existente):
   }
 ```
 
+## PRUEBA ADICIONAL - SBOM (NOT UPLOAD)
+
 ## 7. Anexos:
 - Conexión al container de la db:
 ```bash
