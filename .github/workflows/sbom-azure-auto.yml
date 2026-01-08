@@ -11,10 +11,9 @@ env:
   AZURE_NSG_NAME: "vm-scaowaspdeptrack-qa-eastus2-nsg"
   DEPENDENCY_TRACK_HOST: "https://dtrack-indigotech.eastus2.cloudapp.azure.com"
   
-  # --- CONFIGURACIÓN DEL PROYECTO ---
   PROJECT_NAME: "Indira Viewer"
   
-  # ⚠️ CONFIGURACIÓN DE ESCALABILIDAD (IMPORTANTE)
+  # CONFIGURACIÓN DE ESCALABILIDAD (IMPORTANTE)
   # Usa "WEB" si es SaaS/Web (Sobrescribe Prod). 
   # Usa "DESKTOP" si es instalable (Guarda historial v1, v2...).
   APP_TYPE: "WEB" 
