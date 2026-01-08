@@ -1,10 +1,11 @@
-name: SBOM Scalable Security Pipeline
+name: SBOM Secure Pipeline
 
 on:
   push:
     branches: [ "main", "master" ]
-    tags: [ "v*" ]
-    # ONLY EXECUTES WHEN AFFECTED THESE FILES (DEPS)
+    tags: [ "v*" ] # Se activa con etiquetas como v1.0, v2.0.1, etc.
+    
+    # FILTRO DE RUTAS: Solo se ejecuta si cambian dependencias o el pipeline
     paths:
       - '**/package.json'       # Node.js
       - '**/package-lock.json'  # Node.js
@@ -13,7 +14,7 @@ on:
       - '**/*.csproj'           # .NET
       - '.github/workflows/**'  # YAML
   
-  workflow_dispatch: # Botón manual (siempre útil)
+  workflow_dispatch: # Botón manual
 
 env:
   AZURE_RESOURCE_GROUP: "rg-scaowaspdeptrack-qa-eastus2"
@@ -22,10 +23,7 @@ env:
   
   PROJECT_NAME: "Indira Viewer"
   
-  # ESCALABILITY CONFIGURATION 
-  # Usa "WEB" si es SaaS/Web (Sobrescribe Prod). 
-  # Usa "DESKTOP" si es instalable (Guarda historial v1, v2...).
-  APP_TYPE: "WEB" 
+  # NOTA: Hemos eliminado APP_TYPE porque ahora siempre usaremos el nombre real del Tag
 
 jobs:
   sbom-process:
@@ -38,7 +36,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # --- 🧠 LÓGICA DE VERSIONADO INTELIGENTE ---
+      # --- 🧠 LÓGICA DE VERSIONADO: "MAIN" vs "TAG REAL" ---
       - name: Determine Project Version
         id: versioning
         run: |
@@ -49,14 +47,16 @@ jobs:
           
           # CASO 2: Lanzamiento Oficial (Tags)
           elif [[ "${{ github.ref }}" == "refs/tags/"* ]]; then
+            # Extrae el texto después de 'refs/tags/' (ej: v1.0.0)
             TAG_NAME=${GITHUB_REF#refs/tags/}
             echo "Modo detectado: RELEASE OFICIAL CON TAG ($TAG_NAME)"
             
-            # Asignamos directamente el nombre del tag (ej: v1.0.0) como versión.
-            # Dependency-Track creará una versión nueva para cada tag distinto.
+            # 🔥 AQUÍ ESTÁ LA CLAVE:
+            # Asignamos el valor exacto del tag a la versión.
+            # En Dependency-Track verás "Indira Viewer" -> Versión: "v1.0.0"
             echo "DT_VERSION=$TAG_NAME" >> $GITHUB_ENV
           
-          # CASO 3: Fallback (Cualquier otra rama)
+          # CASO 3: Fallback (Cualquier otra rama experimental)
           else
             echo "Modo detectado: EXPERIMENTAL"
             echo "DT_VERSION=experimental-${{ github.sha }}" >> $GITHUB_ENV
@@ -86,7 +86,7 @@ jobs:
               --protocol Tcp \
               --description "Acceso temporal GitHub Run ${{ github.run_id }}"
             
-            # 2. ESPERAR A AZURE (Crítico para evitar Timeout)
+            # 2. ESPERAR A AZURE
             echo "Regla creada. Esperando 60 segundos para propagación..."
             sleep 60
 
