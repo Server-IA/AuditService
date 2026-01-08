@@ -50,15 +50,11 @@ jobs:
           # CASO 2: Lanzamiento Oficial (Tags)
           elif [[ "${{ github.ref }}" == "refs/tags/"* ]]; then
             TAG_NAME=${GITHUB_REF#refs/tags/}
-            echo "Modo detectado: RELEASE OFICIAL ($TAG_NAME)"
+            echo "Modo detectado: RELEASE OFICIAL CON TAG ($TAG_NAME)"
             
-            if [[ "${{ env.APP_TYPE }}" == "WEB" ]]; then
-               # En Web, sobrescribimos siempre la versión "Production"
-               echo "DT_VERSION=Production" >> $GITHUB_ENV
-            else
-               # En Desktop, guardamos el historial (v1.0, v1.1...)
-               echo "DT_VERSION=$TAG_NAME" >> $GITHUB_ENV
-            fi
+            # Asignamos directamente el nombre del tag (ej: v1.0.0) como versión.
+            # Dependency-Track creará una versión nueva para cada tag distinto.
+            echo "DT_VERSION=$TAG_NAME" >> $GITHUB_ENV
           
           # CASO 3: Fallback (Cualquier otra rama)
           else
