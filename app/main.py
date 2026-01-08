@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Audit vars
 AUDIT_TOKEN = os.getenv("AUDIT_TOKEN")
 if not AUDIT_TOKEN:
     raise RuntimeError("AUDIT_TOKEN no está definido en el entorno")
