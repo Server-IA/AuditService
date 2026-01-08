@@ -1,15 +1,23 @@
-name: SBOM Auto-Deploy (Dynamic Firewall)
+name: SBOM Scalable Security Pipeline
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master" ] # Se activa en el desarrollo diario
+    tags: [ "v*" ]                 # Se activa en lanzamientos (ej: v1.0.0)
   workflow_dispatch:
 
 env:
   AZURE_RESOURCE_GROUP: "rg-scaowaspdeptrack-qa-eastus2"
   AZURE_NSG_NAME: "vm-scaowaspdeptrack-qa-eastus2-nsg"
   DEPENDENCY_TRACK_HOST: "https://dtrack-indigotech.eastus2.cloudapp.azure.com"
+  
+  # --- CONFIGURACIÓN DEL PROYECTO ---
   PROJECT_NAME: "Indira Viewer"
+  
+  # ⚠️ CONFIGURACIÓN DE ESCALABILIDAD (IMPORTANTE)
+  # Usa "WEB" si es SaaS/Web (Sobrescribe Prod). 
+  # Usa "DESKTOP" si es instalable (Guarda historial v1, v2...).
+  APP_TYPE: "WEB" 
 
 jobs:
   sbom-process:
@@ -21,6 +29,34 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+
+      # --- 🧠 LÓGICA DE VERSIONADO INTELIGENTE ---
+      - name: Determine Project Version
+        id: versioning
+        run: |
+          # CASO 1: Desarrollo Diario (Ramas main/master)
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            echo "Modo detectado: DESARROLLO CONTINUO"
+            echo "DT_VERSION=main" >> $GITHUB_ENV
+          
+          # CASO 2: Lanzamiento Oficial (Tags)
+          elif [[ "${{ github.ref }}" == "refs/tags/"* ]]; then
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+            echo "Modo detectado: RELEASE OFICIAL ($TAG_NAME)"
+            
+            if [[ "${{ env.APP_TYPE }}" == "WEB" ]]; then
+               # En Web, sobrescribimos siempre la versión "Production"
+               echo "DT_VERSION=Production" >> $GITHUB_ENV
+            else
+               # En Desktop, guardamos el historial (v1.0, v1.1...)
+               echo "DT_VERSION=$TAG_NAME" >> $GITHUB_ENV
+            fi
+          
+          # CASO 3: Fallback (Cualquier otra rama)
+          else
+            echo "Modo detectado: EXPERIMENTAL"
+            echo "DT_VERSION=experimental-${{ github.sha }}" >> $GITHUB_ENV
+          fi
 
       - name: Azure Login
         uses: azure/login@v1
@@ -46,7 +82,7 @@ jobs:
               --protocol Tcp \
               --description "Acceso temporal GitHub Run ${{ github.run_id }}"
             
-            # 2. ESPERAR A AZURE (La cura para el error)
+            # 2. ESPERAR A AZURE (Crítico para evitar Timeout)
             echo "Regla creada. Esperando 60 segundos para propagación..."
             sleep 60
 
@@ -63,14 +99,14 @@ jobs:
 
       - name: Upload Report
         run: |
-          echo "Enviando a ${{ env.DEPENDENCY_TRACK_HOST }}..."
-          # Agregamos --verbose (-v) para ver más detalles si falla
+          echo "Subiendo a Proyecto: ${{ env.PROJECT_NAME }} - Versión: ${{ env.DT_VERSION }}"
+          
           curl -v -X POST "${{ env.DEPENDENCY_TRACK_HOST }}/api/v1/bom" \
             -H "Content-Type: multipart/form-data" \
             -H "X-Api-Key: ${{ secrets.DTRACK_KEY }}" \
             -F "autoCreate=true" \
             -F "projectName=${{ env.PROJECT_NAME }}" \
-            -F "projectVersion=${{ github.sha }}" \
+            -F "projectVersion=${{ env.DT_VERSION }}" \
             -F "bom=@bom.xml"
 
       - name: Close Firewall Rule
