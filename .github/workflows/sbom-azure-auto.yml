@@ -9,8 +9,8 @@ on:
       - '**/package.json'       # Node.js
       - '**/package-lock.json'  # Node.js
       - '**/pom.xml'            # Java
-      - '**/requirements.txt'   # Python (si tuvieras)
-      - '**/*.csproj'           # .NET (si tuvieras)
+      - '**/requirements.txt'   # Python
+      - '**/*.csproj'           # .NET
       - '.github/workflows/**'  # YAML
   
   workflow_dispatch: # Botón manual (siempre útil)
