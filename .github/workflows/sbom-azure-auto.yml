@@ -13,7 +13,7 @@ env:
   
   PROJECT_NAME: "Indira Viewer"
   
-  # CONFIGURACIÓN DE ESCALABILIDAD (IMPORTANTE)
+  # ESCALABILITY CONFIGURATION 
   # Usa "WEB" si es SaaS/Web (Sobrescribe Prod). 
   # Usa "DESKTOP" si es instalable (Guarda historial v1, v2...).
   APP_TYPE: "WEB" 
