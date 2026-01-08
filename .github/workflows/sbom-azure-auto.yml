@@ -2,9 +2,18 @@ name: SBOM Scalable Security Pipeline
 
 on:
   push:
-    branches: [ "main", "master" ] # Se activa en el desarrollo diario
-    tags: [ "v*" ]                 # Se activa en lanzamientos (ej: v1.0.0)
-  workflow_dispatch:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+    # ONLY EXECUTES WHEN AFFECTED THESE FILES (DEPS)
+    paths:
+      - '**/package.json'       # Para Node.js
+      - '**/package-lock.json'  # Para Node.js
+      - '**/pom.xml'            # Para Java (si tuvieras)
+      - '**/requirements.txt'   # Para Python (si tuvieras)
+      - '**/*.csproj'           # Para .NET (si tuvieras)
+      - '.github/workflows/**'  # Si editas este mismo YAML
+  
+  workflow_dispatch: # Botón manual (siempre útil)
 
 env:
   AZURE_RESOURCE_GROUP: "rg-scaowaspdeptrack-qa-eastus2"
